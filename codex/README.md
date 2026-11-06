@@ -105,7 +105,6 @@ For a new repository convention, explicitly set its repository applicability. Th
 ## Verify
 
 ```sh
-npm test
 npm run mcp:roundtrip -- https://ompi-memory.roundtrip.workers.dev
 ```
 

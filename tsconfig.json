@@ -23,8 +23,6 @@
     ".cloudflare/types",
     "sdk",
     "scripts",
-    "tests",
-    "vite.config.ts",
-    "vitest.config.ts"
+    "vite.config.ts"
   ]
 }

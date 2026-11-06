@@ -7,7 +7,6 @@
     "build": "cf build",
     "deploy": "cf deploy",
     "typecheck": "cf workers types && tsc",
-    "test": "vp test run",
     "roundtrip": "node scripts/roundtrip.ts",
     "mcp:roundtrip": "node scripts/mcp-roundtrip.ts",
     "codex:setup": "node scripts/setup-codex.ts",

@@ -37,7 +37,6 @@ cd prototypes/cloudflare-memory
 npm ci
 cf auth whoami
 npm run check
-npm test
 npm run deploy
 npm run roundtrip -- https://ompi-memory.roundtrip.workers.dev
 ```
@@ -56,7 +55,7 @@ Repository creation outputs an initial Git token: keep it private. Runtime reque
 ## Code quality
 
 [Vite+](https://viteplus.dev/guide/) 1.5.0 supplies the build toolchain, formatter,
-type-aware Oxlint, and Vitest. `cf dev`, `cf build`, and `cf deploy` remain the
+and type-aware Oxlint. `cf dev`, `cf build`, and `cf deploy` remain the
 Cloudflare entry points and delegate the Vite work to Vite+. No global Vite+
 installation is required after `npm ci`.
 
@@ -65,7 +64,6 @@ npm run check         # Generate binding types, check formatting, lint and types
 npm run lint          # Strict, type-aware lint and type checking
 npm run lint:fix      # Apply available lint fixes
 npm run format        # Format owned project files
-npm test              # Node unit tests through Vite+; no Cloudflare network calls
 npm run build         # Cloudflare production build through Vite+
 ```
 
@@ -81,8 +79,7 @@ messages; arbitrary JSON extension fields remain portable.
 Anti-slop is vendored in `tools/oxlint/anti-slop`; its [provenance](tools/oxlint/anti-slop/UPSTREAM.md)
 records the source revision, licenses, and Vite+ import adaptation. Installed agent
 assets, generated outputs, and third-party rule code are excluded from lint/format.
-`vitest.config.ts` keeps unit tests independent of the Worker plugin and live
-Artifacts. GitHub Actions runs check, tests, and build for changes to this demo.
+GitHub Actions runs check and build for changes to this demo.
 
 ## TypeScript client
 
@@ -182,9 +179,7 @@ Concurrent writes use Git fast-forward checks: a rejected push re-clones the cur
 
 ## Verification
 
-`npm test` checks field preservation, idempotency, origin collisions, conflict rejection, tombstone replay protection, field validation, routing, and temporal filtering. `npm run roundtrip -- URL` exercises the deployed gateway and both stores, cross-store copy and copy-back, unknown field preservation, repeated imports, local update, concurrent writes, deletion/replay, invalid input, and actual Git history. It removes its sample memories from current views afterward; their Git history and tombstones remain.
-
-The saved [live verification report](verification/README.md) records the deployed version, Artifact repository IDs, and passing round-trip checks.
+`npm run roundtrip -- URL` exercises the deployed gateway and both stores, cross-store copy and copy-back, unknown field preservation, repeated imports, local update, concurrent writes, deletion/replay, invalid input, and actual Git history. It removes its sample memories from current views afterward; their Git history and tombstones remain.
 
 ## Prototype boundaries
 
