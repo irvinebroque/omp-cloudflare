@@ -6,8 +6,8 @@ Exact source commit: `13909c9e07590f5a85d93c62712259fe14a883f7`.
 
 Installed with that revision's `skills/install-anti-slop/scripts/install.mjs` from
 `skills/install-anti-slop/assets/anti-slop/` into this directory. The generic
-plugin is enabled in `vite.config.ts`; the bundled Effect plugin is retained but
-not enabled because this project has no direct Effect dependency.
+plugin is enabled in `vite.config.ts`. The unused opt-in `effect/` directory was
+removed because this project has no direct Effect dependency.
 
 Intentional deviation: Vite+ migration rewrote `@oxlint/plugins` imports to
 `vite-plus/lint/plugins`. This uses Vite+ 1.5.0's matching Oxlint 1.91.0 plugin

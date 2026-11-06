@@ -81,7 +81,6 @@ messages; arbitrary JSON extension fields remain portable.
 Anti-slop is vendored in `tools/oxlint/anti-slop`; its [provenance](tools/oxlint/anti-slop/UPSTREAM.md)
 records the source revision, licenses, and Vite+ import adaptation. Installed agent
 assets, generated outputs, and third-party rule code are excluded from lint/format.
-Effect rules are not enabled because this implementation does not use Effect.
 `vitest.config.ts` keeps unit tests independent of the Worker plugin and live
 Artifacts. GitHub Actions runs check, tests, and build for changes to this demo.
 

@@ -25,7 +25,7 @@ const label = z
   .refine((value) => value.trim().length > 0);
 
 /** OMP editors' draft v0.2 minimal profile; arbitrary JSON extensions survive parsing. */
-export const memoryFieldsSchema = z
+export const memorySchema = z
   .object({
     identifier: label,
     media_type: z
@@ -43,15 +43,14 @@ export const memoryFieldsSchema = z
     valid_until: timestampSchema.optional(),
     x_omp_origin: label.optional(),
   })
-  .catchall(jsonValue);
-
-export const memorySchema = memoryFieldsSchema.refine(
-  (memory) =>
-    memory.valid_from === undefined ||
-    memory.valid_until === undefined ||
-    Date.parse(memory.valid_from) < Date.parse(memory.valid_until),
-  "valid_until must follow valid_from",
-);
+  .catchall(jsonValue)
+  .refine(
+    (memory) =>
+      memory.valid_from === undefined ||
+      memory.valid_until === undefined ||
+      Date.parse(memory.valid_from) < Date.parse(memory.valid_until),
+    "valid_until must follow valid_from",
+  );
 
 export type Memory = z.infer<typeof memorySchema>;
 
@@ -122,15 +121,6 @@ export function text(value: JsonInput, name: string, max = 256) {
 
   if (!result.success)
     throw new ApiError(400, name + " must be a nonempty string of at most " + max + " characters");
-
-  return result.data;
-}
-
-export function timestamp(value: JsonInput, name: string) {
-  const result = timestampSchema.safeParse(value);
-
-  if (!result.success)
-    throw new ApiError(400, name + " must be an ISO 8601 timestamp with timezone");
 
   return result.data;
 }

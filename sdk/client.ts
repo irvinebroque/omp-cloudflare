@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { memoryFieldsSchema, type Archive, type JsonInput, type Memory } from "../src/model.ts";
+import type { Archive, JsonInput, Memory } from "../src/model.ts";
 import {
   decodeResponse,
   requestOptions,
@@ -20,9 +20,7 @@ export type { Archive, Memory, Receipt } from "../src/model.ts";
 
 export type Store = z.infer<typeof storeSchema>;
 
-const memoryInput = memoryFieldsSchema.partial().required({ body: true });
-
-export type MemoryInput = z.input<typeof memoryInput>;
+export type MemoryInput = Partial<Memory> & Pick<Memory, "body">;
 
 export type SavedMemory = z.infer<typeof savedResponse>;
 
