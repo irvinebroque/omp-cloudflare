@@ -65,14 +65,14 @@ Search first returns short snippets and exact references. Fetch selected bodies 
 
 ## Tools
 
-| Tool | Required inputs | Behavior |
-| --- | --- | --- |
-| `about_omp` | None | Capabilities, limitations, and binding guidance. Also available as resource `omp://about`. |
-| `search_memories` | `context` | Optional `query`, `store`, `limit`; otherwise search both stores. |
-| `get_memory` | `store`, `identifier`, `origin`, `context` | Full runtime record with provenance and an opaque `version`. |
-| `add_memory` | `store`, `body`, `applies_to`, `contributor` | Optional title, identifier, tags, media type, activation. Server supplies creation time and origin. |
-| `update_memory` | Reference, context, `if_version`, `patch`, `contributor` | Guarded local edit; omitted and unknown stored fields survive. Imported memories are immutable here. |
-| `delete_memory` | Reference, context, `if_version` | Remove from current views and add a tombstone. Historical bodies remain. |
+| Tool              | Required inputs                                          | Behavior                                                                                             |
+| ----------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `about_omp`       | None                                                     | Capabilities, limitations, and binding guidance. Also available as resource `omp://about`.           |
+| `search_memories` | `context`                                                | Optional `query`, `store`, `limit`; otherwise search both stores.                                    |
+| `get_memory`      | `store`, `identifier`, `origin`, `context`               | Full runtime record with provenance and an opaque `version`.                                         |
+| `add_memory`      | `store`, `body`, `applies_to`, `contributor`             | Optional title, identifier, tags, media type, activation. Server supplies creation time and origin.  |
+| `update_memory`   | Reference, context, `if_version`, `patch`, `contributor` | Guarded local edit; omitted and unknown stored fields survive. Imported memories are immutable here. |
+| `delete_memory`   | Reference, context, `if_version`                         | Remove from current views and add a tombstone. Historical bodies remain.                             |
 
 Tool schemas reject unknown arguments. Failures return MCP tool errors with a status and guidance. An update conflict means reread and reconcile; blindly retrying the same edit is incorrect. The token hashes one complete memory, so another memory's write does not invalidate it. It is not a standardized OMP revision comparator. Git's own fast-forward check also guards each persistence operation.
 

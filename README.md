@@ -58,28 +58,34 @@ Repository creation outputs an initial Git token: keep it private. Runtime reque
 The source client is `sdk/client.ts`. It uses standard `fetch` and exports the draft memory and archive types. Import it directly in TypeScript; it has not been published to npm.
 
 ```ts
-import { OmpClient, OmpGateway } from './sdk/client.ts';
+import { OmpClient, OmpGateway } from "./sdk/client.ts";
 
-const url = 'https://ompi-memory.roundtrip.workers.dev';
+const url = "https://ompi-memory.roundtrip.workers.dev";
 const gateway = new OmpGateway(url);
 
-await gateway.remember({
-  identifier: 'demo-preference', // Stable identity; read after an uncertain write before retrying.
-  body: 'The user prefers concise answers.',
-  tags: ['preference'],
-}, 'personal');
+await gateway.remember(
+  {
+    identifier: "demo-preference", // Stable identity; read after an uncertain write before retrying.
+    body: "The user prefers concise answers.",
+    tags: ["preference"],
+  },
+  "personal",
+);
 
-await gateway.remember({
-  identifier: 'demo-company-process',
-  body: 'Example company releases happen on Fridays.',
-  tags: ['decision'],
-}, 'company');
+await gateway.remember(
+  {
+    identifier: "demo-company-process",
+    body: "Example company releases happen on Fridays.",
+    tags: ["decision"],
+  },
+  "company",
+);
 
-const hits = await gateway.search('Friday');
+const hits = await gateway.search("Friday");
 // hits.memories: [{ store: 'company', memory: {...}, commit: '...' }]
 
-const personal = new OmpClient(url, 'personal');
-const company = new OmpClient(url, 'company');
+const personal = new OmpClient(url, "personal");
+const company = new OmpClient(url, "company");
 const snapshot = await personal.export();
 const receipt = await company.import(snapshot); // Explicit copy, never automatic sync.
 console.log(receipt.receipts);
@@ -89,22 +95,22 @@ console.log(receipt.receipts);
 
 `GET /fmp/info` advertises prototype capabilities and limitations. `GET /gateway/info` describes connected stores and routing.
 
-| Method | Gateway endpoint | JSON body |
-| --- | --- | --- |
-| POST | `/gateway/fmp/search` | `{ "query": "TypeScript", "limit": 20 }` — searches both stores |
-| POST | `/gateway/fmp/upload/inferences` | `{ "store": "personal", "memory": { "identifier": "note-1", "body": "Use TypeScript" } }` |
-| POST | `/gateway/fmp/read` | `{ "store": "company", "identifier": "note-1", "origin": "optional-origin" }` |
-| POST | `/gateway/fmp/update` | `{ "store": "personal", "identifier": "note-1", "if_version": "optional-token-from-read", "patch": { "body": "Use Rust" } }` |
-| POST | `/gateway/fmp/delete` | `{ "store": "personal", "identifier": "note-1" }` |
-| POST | `/gateway/fmp/import` | An exported archive plus `"store": "company"` |
+| Method | Gateway endpoint                 | JSON body                                                                                                                    |
+| ------ | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/gateway/fmp/search`            | `{ "query": "TypeScript", "limit": 20 }` — searches both stores                                                              |
+| POST   | `/gateway/fmp/upload/inferences` | `{ "store": "personal", "memory": { "identifier": "note-1", "body": "Use TypeScript" } }`                                    |
+| POST   | `/gateway/fmp/read`              | `{ "store": "company", "identifier": "note-1", "origin": "optional-origin" }`                                                |
+| POST   | `/gateway/fmp/update`            | `{ "store": "personal", "identifier": "note-1", "if_version": "optional-token-from-read", "patch": { "body": "Use Rust" } }` |
+| POST   | `/gateway/fmp/delete`            | `{ "store": "personal", "identifier": "note-1" }`                                                                            |
+| POST   | `/gateway/fmp/import`            | An exported archive plus `"store": "company"`                                                                                |
 
 Every store also exposes these endpoints directly at `/stores/{personal|company}/fmp/...` without the `store` field. Additional store endpoints:
 
-| Method | Endpoint | Meaning |
-| --- | --- | --- |
-| GET | `/stores/:store/fmp/read_inferences` | Export snapshot, manifest, tombstones, storage commit |
-| GET | `/stores/:store/history` | Latest 20 Artifacts Git commits |
-| GET | `/stores/:store/fmp/info` | Store capabilities |
+| Method | Endpoint                             | Meaning                                               |
+| ------ | ------------------------------------ | ----------------------------------------------------- |
+| GET    | `/stores/:store/fmp/read_inferences` | Export snapshot, manifest, tombstones, storage commit |
+| GET    | `/stores/:store/history`             | Latest 20 Artifacts Git commits                       |
+| GET    | `/stores/:store/fmp/info`            | Store capabilities                                    |
 
 `upload/inferences` supplies UUID identifier, `text/plain` media type, and current timestamp if absent. Imported memories must contain the draft's required fields (`identifier`, `media_type`, `created_at`, `body`). The body is text, including when its media type is JSON. Unknown fields survive storage and export/import. `read` retrieves by identifier with optional origin; ambiguous identifiers require origin. Search uses a case-insensitive substring over identifier, body, title, and tags, filtering future and expired memories. It is not semantic/vector search.
 
@@ -113,8 +119,20 @@ Example write response:
 ```json
 {
   "routed_to": "personal",
-  "memory": { "identifier": "note-1", "media_type": "text/plain", "created_at": "2026-11-06T12:00:00Z", "body": "Use TypeScript", "x_omp_origin": "cloudflare-artifacts:ompi-memory-prototype/personal" },
-  "receipts": [{ "identifier": "note-1", "origin": "cloudflare-artifacts:ompi-memory-prototype/personal", "status": "accepted" }],
+  "memory": {
+    "identifier": "note-1",
+    "media_type": "text/plain",
+    "created_at": "2026-11-06T12:00:00Z",
+    "body": "Use TypeScript",
+    "x_omp_origin": "cloudflare-artifacts:ompi-memory-prototype/personal"
+  },
+  "receipts": [
+    {
+      "identifier": "note-1",
+      "origin": "cloudflare-artifacts:ompi-memory-prototype/personal",
+      "status": "accepted"
+    }
+  ],
   "commit": "<40-character Git commit hash>"
 }
 ```

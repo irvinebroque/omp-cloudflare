@@ -10,10 +10,10 @@ Final deployed version: `ee8f5786-c4e6-4978-8089-8890b86ef17a`. The final deploy
 
 Artifacts namespace: `ompi-memory-prototype`
 
-| Role | Artifact repository | Repository ID |
-| --- | --- | --- |
-| Personal store | `personal` | `se35ivyywaz5m982` |
-| Company store | `company` | `jfd5mjujqire4dc6` |
+| Role           | Artifact repository | Repository ID      |
+| -------------- | ------------------- | ------------------ |
+| Personal store | `personal`          | `se35ivyywaz5m982` |
+| Company store  | `company`           | `jfd5mjujqire4dc6` |
 
 Fifteen unit tests and all 14 live REST checks passed on November 6, 2026. See [live-roundtrip.json](live-roundtrip.json) for the source/destination Artifacts commit hashes and assertions. The live test uses separate HTTP requests for persistence verification, exports a memory to the other store, then exports it back and verifies its identity and extension fields. It also checks federated gateway search, explicit routing, and simultaneous writes.
 
