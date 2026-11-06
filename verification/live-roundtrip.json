@@ -2,8 +2,8 @@
   "ok": true,
   "base": "https://ompi-memory.roundtrip.workers.dev",
   "storage": "Cloudflare Artifacts",
-  "sourceCommit": "9955baf02bc9f14b6578f4e3fb1de18dab287d0d",
-  "destinationCommit": "641767c7c21b2521effafe89acb0c2ca362a605a",
+  "sourceCommit": "e2993430562e3f654076b4fa3b2eb7eea43a75c5",
+  "destinationCommit": "43fd86ee4ebfcf40663e9c6792de97817257e511",
   "checks": [
     "write committed to Cloudflare Artifacts",
     "fresh HTTP request reads persisted object",

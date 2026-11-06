@@ -1,6 +1,8 @@
+import { validateMemory } from "../src/model.ts";
 import { test } from "vite-plus/test";
 import assert from "node:assert/strict";
 import {
+  addContribution,
   applicable,
   memoryVersion,
   repositoryKey,
@@ -89,4 +91,26 @@ test("version tokens track the individual memory and extension fields, independe
     memoryVersion(memory),
     memoryVersion({ ...memory, custom: { owner: "changed" } }),
   );
+});
+
+test("unsupported imported provenance cannot be silently overwritten", () => {
+  const original = validateMemory({
+    identifier: "legacy",
+    media_type: "text/plain",
+    created_at: "2026-11-06T00:00:00Z",
+    body: "Evidence",
+    provenance: { source: "legacy evidence" },
+  });
+
+  assert.throws(
+    () => addContribution(original, "agent:codex", "updated"),
+    /Unsupported provenance/u,
+  );
+  assert.deepEqual(original.provenance, { source: "legacy evidence" });
+});
+
+test("paged recall evaluates applicability at the frozen search time", () => {
+  const expiring = { ...memory, valid_until: "2026-01-02T00:00:00Z" };
+  assert.equal(applicable(expiring, {}, Date.parse("2026-01-01T00:00:00Z")), true);
+  assert.equal(applicable(expiring, {}, Date.parse("2026-01-03T00:00:00Z")), false);
 });

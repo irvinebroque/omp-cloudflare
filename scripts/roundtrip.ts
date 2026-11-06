@@ -75,7 +75,18 @@ const snapshot = await personal.export();
 
 const one = {
   ...snapshot,
-  memories: snapshot.memories.filter((m) => m.identifier === id),
+  manifest: {
+    ...snapshot.manifest,
+    x_omp_identity_map: snapshot.manifest.x_omp_identity_map?.filter(
+      (item) => item.identifier === id && item.origin === saved.memory.x_omp_origin,
+    ),
+  },
+  memories: snapshot.memories.filter(
+    (m) =>
+      snapshot.manifest.x_omp_identity_map?.some(
+        (item) => item.identifier === id && item.exported_identifier === m.identifier,
+      ) === true,
+  ),
   tombstones: [],
 };
 
@@ -95,7 +106,18 @@ const back = await destination.export();
 
 const backOne = {
   ...back,
-  memories: back.memories.filter((m) => m.identifier === id),
+  manifest: {
+    ...back.manifest,
+    x_omp_identity_map: back.manifest.x_omp_identity_map?.filter(
+      (item) => item.identifier === id && item.origin === saved.memory.x_omp_origin,
+    ),
+  },
+  memories: back.memories.filter(
+    (m) =>
+      back.manifest.x_omp_identity_map?.some(
+        (item) => item.identifier === id && item.exported_identifier === m.identifier,
+      ) === true,
+  ),
   tombstones: [],
 };
 

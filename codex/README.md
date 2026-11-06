@@ -61,14 +61,14 @@ The harness supplies actual context, for example:
 
 Repository-relative paths are required. Use `directory: "."` at the root. When there is no remote, omit `repository`; do not invent an identity. Empty context can retrieve unscoped/user/organization records, but cannot match repository records. SSH and HTTPS remotes normalize to the same host/path; a separate fork remains a distinct repository.
 
-Search first returns short snippets and exact references. Fetch selected bodies with `get_memory`. Each result remains attributed to its store and original origin. The default limit is 20, maximum 100; check `total` and `partial`. This is substring search, not semantic search. Full exports preserve extension metadata, while MCP returns a smaller runtime projection.
+Search first returns short snippets and exact references. Fetch selected bodies with `get_memory`. Each result remains attributed to its store and original origin. The default limit is 20, maximum 100; check `partial` and follow `next_cursor` with the same query/context/store until null. A changed store snapshot returns 409: restart the search. Always-active memories rank first, then newer matches. This is substring search, not semantic search. Both full exports and MCP `get_memory` preserve extension metadata, including stubs and evidence. Search returns summaries.
 
 ## Tools
 
 | Tool              | Required inputs                                          | Behavior                                                                                             |
 | ----------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `about_omp`       | None                                                     | Capabilities, limitations, and binding guidance. Also available as resource `omp://about`.           |
-| `search_memories` | `context`                                                | Optional `query`, `store`, `limit`; otherwise search both stores.                                    |
+| `search_memories` | `context`                                                | Optional `query`, `store`, `limit`, `cursor`; otherwise search both stores.                          |
 | `get_memory`      | `store`, `identifier`, `origin`, `context`               | Full runtime record with provenance and an opaque `version`.                                         |
 | `add_memory`      | `store`, `body`, `applies_to`, `contributor`             | Optional title, identifier, tags, media type, activation. Server supplies creation time and origin.  |
 | `update_memory`   | Reference, context, `if_version`, `patch`, `contributor` | Guarded local edit; omitted and unknown stored fields survive. Imported memories are immutable here. |
@@ -134,3 +134,5 @@ npm run codex:setup -- --uninstall
 For a custom endpoint, pass that same URL along with `--uninstall`. No account authentication, automatic synchronization, startup hooks, or native Codex internal-memory migration is provided by this prototype.
 
 Official setup references: [Codex MCP configuration](https://learn.chatgpt.com/docs/extend/mcp?surface=cli), [skill discovery and symlinks](https://learn.chatgpt.com/docs/build-skills).
+
+`npm run codex:roundtrip` runs a model-generated save and recall in two fresh, ephemeral CLI processes. It uses an isolated temporary working directory, checks the actual MCP add/search/get tool events, verifies persistence independently over REST, and removes the sample canary afterward. The second prompt contains a lookup label but never the random value. This needs a working CLI model provider/login; `codex:check` only verifies discovery. Override the endpoint with `npm run codex:roundtrip -- https://your-worker.workers.dev`.

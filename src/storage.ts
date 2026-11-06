@@ -114,6 +114,15 @@ export async function mutate<T>(
 
     return await attemptWrite(0);
   } finally {
-    await repo.revokeToken(token.plaintext);
+    await revokeWriteToken(() => repo.revokeToken(token.plaintext));
+  }
+}
+
+/** Token TTL bounds a cleanup failure; cleanup must not replace a committed result or primary error. */
+export async function revokeWriteToken(revoke: () => Promise<boolean>) {
+  try {
+    await revoke();
+  } catch {
+    console.error("Artifact write token cleanup failed; token expires after 300 seconds");
   }
 }

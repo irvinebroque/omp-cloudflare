@@ -15,6 +15,13 @@ import {
 export type Api = (request: Request) => Promise<Response>;
 
 const short = z.string().trim().min(1).max(256);
+
+const opaque = z
+  .string()
+  .min(1)
+  .max(256)
+  .refine((value) => value.trim().length > 0);
+
 const storeSchema = z.enum(["personal", "company"]);
 
 const context = z.strictObject({
@@ -56,8 +63,8 @@ const activation = z.strictObject({
 
 const ref = {
   store: storeSchema,
-  identifier: short,
-  origin: short.describe("Original origin returned by search/add/get; preserve it across copies."),
+  identifier: opaque,
+  origin: opaque.describe("Original origin returned by search/add/get; preserve it across copies."),
 };
 
 const mutable = {
@@ -118,24 +125,8 @@ async function run(operation: () => Promise<Record<string, JsonInput>>) {
   }
 }
 
-// Deliberately project full interchange records into compact runtime data.
 function project(target: string, memory: Memory) {
-  return {
-    ref: reference(target, memory),
-    version: memoryVersion(memory),
-    memory: {
-      identifier: memory.identifier,
-      media_type: memory.media_type,
-      body: memory.body,
-      title: memory.title,
-      tags: memory.tags,
-      created_at: memory.created_at,
-      updated_at: memory.updated_at,
-      applies_to: memory.applies_to,
-      activation: memory.activation,
-      provenance: memory.provenance,
-    },
-  };
+  return { ref: reference(target, memory), version: memoryVersion(memory), memory };
 }
 
 export function createServer(api: Api, base: URL): McpServer {
@@ -199,6 +190,7 @@ export function createServer(api: Api, base: URL): McpServer {
         context,
         store: storeSchema.optional(),
         limit: z.number().int().min(1).max(100).default(20),
+        cursor: z.string().max(4096).optional(),
       }),
       annotations: read,
     },
@@ -211,6 +203,8 @@ export function createServer(api: Api, base: URL): McpServer {
           memories: data.memories.map(({ store, memory }) => ({
             ref: reference(store, memory),
             version: memoryVersion(memory),
+            stub: memory.stub,
+            evidence: memory.evidence,
             title: memory.title,
             snippet: memory.body.slice(0, 240),
             applies_to: memory.applies_to,
@@ -218,7 +212,7 @@ export function createServer(api: Api, base: URL): McpServer {
             created_at: memory.created_at,
           })),
           guidance:
-            "Fetch selected bodies with get_memory. total may exceed the returned limit; increase limit if necessary. Legacy unscoped memories are included.",
+            "Fetch selected bodies with get_memory. Follow next_cursor with the same query/context/store until null; restart search on a 409 stale cursor. Legacy unscoped memories are included.",
         };
       }),
   );
@@ -244,7 +238,7 @@ export function createServer(api: Api, base: URL): McpServer {
         "Save durable knowledge in an explicit personal or company store. Supply applies_to for new memories; repository rules need their remote URL. Contributor is self-declared. Each call without an identifier creates a new memory; do not blindly retry an uncertain write.",
       inputSchema: z.strictObject({
         store: storeSchema,
-        identifier: short.optional(),
+        identifier: opaque.optional(),
         body: z.string().min(1).max(16384),
         title: short.optional(),
         tags: z.array(z.string().max(128)).max(32).optional(),

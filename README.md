@@ -117,9 +117,15 @@ const hits = await gateway.search("Friday");
 
 const personal = new OmpClient(url, "personal");
 const company = new OmpClient(url, "company");
-const snapshot = await personal.export();
-const receipt = await company.import(snapshot); // Explicit copy, never automatic sync.
-console.log(receipt.receipts);
+// Export is paginated: import every page, including tombstones.
+async function copyPage(cursor?: string): Promise<void> {
+  const snapshot = await personal.export(cursor);
+  const receipt = await company.import(snapshot);
+  console.log(receipt.receipts);
+  if (snapshot.next_cursor !== null) await copyPage(snapshot.next_cursor);
+}
+await copyPage();
+// Copy is explicit; this does not enable automatic sync.
 ```
 
 ## HTTP API
@@ -172,7 +178,7 @@ The `x_omp_origin` extension preserves `(origin, identifier)` across multi-hop c
 
 Deletion removes a memory from the current view and exports and records a content-free tombstone. Tombstones block stale imports of that identity and propagate to another store when its snapshot is explicitly imported. **Git history retains old content: deletion is not secure erasure, forget, or automatic revocation of other copies.** No audit-profile conformance is claimed.
 
-Concurrent writes use Git fast-forward checks: a rejected push re-clones the current branch and reapplies the operation, up to four attempts. No force pushes. Reads return a per-memory `version` token; passing it as `if_version` to update/delete rejects stale edits with 409. MCP requires this guard, while existing REST callers may opt in. A storage failure returns 503; after an uncertain create, search/read before retrying because generated timestamps/identifiers do not guarantee idempotency. Request bodies are capped at 1 MiB, each memory body at 16 KiB, and each store at 100 memories / 500 tombstones / 512 KiB of current state. Git history continues growing. This is a small demo, not a high-throughput memory database.
+Concurrent writes use Git fast-forward checks: a rejected push re-clones the current branch and reapplies the operation, up to four attempts. No force pushes. Reads return a per-memory `version` token; passing it as `if_version` to update/delete rejects stale edits with 409. MCP requires this guard, while existing REST callers may opt in. A storage failure returns 503; after an uncertain create, search/read before retrying because generated timestamps/identifiers do not guarantee idempotency. Request bodies are capped at 1 MiB, each memory body at 16 KiB, and each store at 100 active memories / 512 KiB of active memory JSON. The deletion ledger has no fixed entry cap and is retained to prevent stale-copy resurrection; it and Git history still consume Artifact storage and processing time. Git history continues growing. This is a small demo, not a high-throughput memory database.
 
 ## Verification
 
@@ -183,3 +189,9 @@ The saved [live verification report](verification/README.md) records the deploye
 ## Prototype boundaries
 
 No authentication, authorization, scope policy, tenant separation, semantic search, transcript/file ingestion, automatic consolidation, secure forget, or full audit compliance. Runtime applicability/activation filtering is an experimental convention, not access control. Anyone who knows the demo URL can read and write both stores. Use sample data. The account and deployment names are intentionally committed; credentials are not.
+
+Search accepts an optional `cursor` and returns `next_cursor` (null on the last page). Keep query, context, and store selection unchanged while paging. Results rank always-active memories first, then creation time and identity. Cursors freeze the validity-filter time and bind store commits; a changed store or query/context returns 409, so restart without a cursor. Partial federation remains explicit in `partial` and per-store status.
+
+Exports contain unique deterministic IDs, plus `manifest.x_omp_identity_map` mapping those IDs to original `(origin, identifier)` pairs. Our importer restores those identities; receivers that ignore extensions still receive unambiguous IDs within the export. Preserve the map when copying or selecting records. `GET /stores/{store}/fmp/read_inferences?cursor=...` pages the retained tombstones (50 per page); memories appear on the first page only. Import every page and restart the export on 409 if the source changes. The demo UI downloads all pages as JSONL (one archive per line), and its copy action imports every page. This is an experimental extension, not a standardized OMP runtime or deletion protocol. Deletion-ledger processing remains linear in retained history, so large deployments need a different storage index.
+
+MCP reads preserve full memory metadata. Updating a record whose imported `provenance` is not an array returns 409 rather than silently erasing that evidence. Write-token cleanup failures are logged separately; the five-minute token TTL still applies and the original operation result is preserved.

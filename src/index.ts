@@ -1,6 +1,8 @@
 import {
   ApiError,
   archive,
+  importedMemories,
+  EXPORT_TOMBSTONE_PAGE_SIZE,
   key,
   merge,
   object,
@@ -13,8 +15,15 @@ import {
   validateMemory,
 } from "./model.ts";
 import { mutate, read, STORES } from "./storage.ts";
+import { pageInput, paginate } from "./pagination.ts";
 import { page } from "./page.ts";
-import { federatedSearch, targetStore, searchInput, searchMemories } from "./gateway.ts";
+import {
+  federatedSearch,
+  targetStore,
+  searchInput,
+  searchMemories,
+  compareMemories,
+} from "./gateway.ts";
 import {
   addContribution,
   applicable,
@@ -179,8 +188,20 @@ async function route(request: Request, env: Env): Promise<Response> {
   if (request.method === "GET" && path === "fmp/read_inferences") {
     const { state, commit } = await read(env.ARTIFACTS, store);
 
+    const input = pageInput({
+      limit: EXPORT_TOMBSTONE_PAGE_SIZE,
+      cursor: url.searchParams.get("cursor") ?? undefined,
+    });
+
+    const chunk = paginate(state.tombstones, input, { commit, store, operation: "export" });
+
     return json({
-      ...archive(state),
+      ...archive({
+        ...state,
+        memories: input.position === undefined ? state.memories : [],
+        tombstones: chunk.items,
+      }),
+      next_cursor: chunk.next_cursor,
       storage: { provider: "cloudflare-artifacts", repo: store, commit },
     });
   }
@@ -203,15 +224,23 @@ async function route(request: Request, env: Env): Promise<Response> {
   }
 
   if (path === "fmp/search") {
-    const { query, limit } = searchInput(data);
+    const input = searchInput(data);
+    const { query, as_of } = input;
     const { state, commit } = await read(env.ARTIFACTS, store);
     const context = data.context === undefined ? undefined : validateContext(data.context);
 
-    const memories = searchMemories(state.memories, query).filter(
-      (m) => context === undefined || applicable(m, context),
-    );
+    const memories = searchMemories(state.memories, query, as_of)
+      .filter((m) => context === undefined || applicable(m, context, as_of))
+      .toSorted(compareMemories);
 
-    return json({ memories: memories.slice(0, limit), total: memories.length, commit });
+    const chunk = paginate(memories, input, { commit, store, context });
+
+    return json({
+      memories: chunk.items,
+      total: chunk.total,
+      next_cursor: chunk.next_cursor,
+      commit,
+    });
   }
 
   if (path === "fmp/upload/inferences") {
@@ -327,13 +356,8 @@ async function route(request: Request, env: Env): Promise<Response> {
     const parsed = archiveSchema.safeParse(data);
 
     if (!parsed.success) throw new ApiError(400, "Invalid OMP 0.2 minimal snapshot/copy archive");
-    const { manifest, tombstones } = parsed.data;
-
-    const memories = parsed.data.memories.map((memory) => {
-      memory.x_omp_origin ??= manifest.origin;
-
-      return memory;
-    });
+    const { tombstones } = parsed.data;
+    const memories = importedMemories(parsed.data);
 
     const result = await mutate(env.ARTIFACTS, store, "Import OMP snapshot", (state) => ({
       receipts: merge(state, memories, tombstones),

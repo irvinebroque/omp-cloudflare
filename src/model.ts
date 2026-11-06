@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 
 export const jsonValue = z.json();
@@ -65,10 +66,13 @@ export type Tombstone = z.infer<typeof tombstoneSchema>;
 export const stateSchema = z.object({
   origin: label,
   memories: z.array(memorySchema).max(100),
-  tombstones: z.array(tombstoneSchema).max(500),
+  tombstones: z.array(tombstoneSchema),
 });
 
 export type State = z.infer<typeof stateSchema>;
+
+// Keeps even worst-case escaped identifiers plus 512 KiB of active memories below the 1 MiB import limit.
+export const EXPORT_TOMBSTONE_PAGE_SIZE = 50;
 
 export const archiveSchema = z.object({
   manifest: z.object({
@@ -79,6 +83,16 @@ export const archiveSchema = z.object({
     selection: z.literal("snapshot"),
     intent: z.literal("copy"),
     media_types: z.array(z.string()),
+    x_omp_identity_map: z
+      .array(
+        z.object({
+          exported_identifier: label,
+          origin: label,
+          identifier: label,
+        }),
+      )
+      .max(100)
+      .optional(),
   }),
   memories: z.array(memorySchema).max(100),
   tombstones: z.array(tombstoneSchema).max(500).default([]),
@@ -214,18 +228,34 @@ export function merge(
     };
   });
 
-  if (all.size > 100 || deleted.size > 500)
-    throw new ApiError(413, "Prototype limit: 100 memories and 500 tombstones per store");
+  if (all.size > 100) throw new ApiError(413, "Prototype limit: 100 active memories per store");
   state.memories = [...all.values()];
   state.tombstones = [...deleted.values()];
 
-  if (new TextEncoder().encode(JSON.stringify(state)).length > 524288)
-    throw new ApiError(413, "Prototype store limit: 512 KiB");
+  if (new TextEncoder().encode(JSON.stringify(state.memories)).length > 524288)
+    throw new ApiError(413, "Prototype active memory limit: 512 KiB");
 
   return receipts;
 }
 
 export function archive(state: State): Archive {
+  const mapping = state.memories.map((memory) => ({
+    exported_identifier:
+      "omp-" + createHash("sha256").update(key(memory, state.origin)).digest("hex"),
+    origin: memory.x_omp_origin ?? state.origin,
+    identifier: memory.identifier,
+  }));
+
+  if (new Set(mapping.map((item) => item.exported_identifier)).size !== mapping.length)
+    throw new ApiError(409, "Export identity collision");
+
+  const identities = new Map(
+    mapping.map((item) => [
+      key({ identifier: item.identifier, x_omp_origin: item.origin }, state.origin),
+      item.exported_identifier,
+    ]),
+  );
+
   return {
     manifest: {
       protocol_version: "0.2",
@@ -235,8 +265,54 @@ export function archive(state: State): Archive {
       selection: "snapshot",
       intent: "copy",
       media_types: [...new Set(state.memories.map((memory) => memory.media_type))],
+      x_omp_identity_map: mapping,
     },
-    memories: state.memories,
+    memories: state.memories.map((memory) => ({
+      ...memory,
+      identifier: text(identities.get(key(memory, state.origin)), "exported identifier"),
+    })),
     tombstones: state.tombstones,
   };
+}
+
+/** Restore our explicit identity mapping; generic OMP readers still get unique export IDs. */
+export function importedMemories(snapshot: Archive): Memory[] {
+  const identifiers = new Set(snapshot.memories.map((memory) => memory.identifier));
+
+  if (identifiers.size !== snapshot.memories.length)
+    throw new ApiError(400, "Duplicate identifiers in export");
+  const mapping = snapshot.manifest.x_omp_identity_map;
+
+  if (mapping === undefined)
+    return snapshot.memories.map((memory) => ({
+      ...memory,
+      x_omp_origin: memory.x_omp_origin ?? snapshot.manifest.origin,
+    }));
+  const byExport = new Map(mapping.map((item) => [item.exported_identifier, item]));
+
+  const originalKeys = new Set(
+    mapping.map((item) =>
+      key({ identifier: item.identifier, x_omp_origin: item.origin }, snapshot.manifest.origin),
+    ),
+  );
+
+  if (
+    mapping.length !== identifiers.size ||
+    byExport.size !== mapping.length ||
+    originalKeys.size !== mapping.length ||
+    mapping.some((item) => !identifiers.has(item.exported_identifier))
+  )
+    throw new ApiError(400, "Invalid export identity mapping");
+
+  return snapshot.memories.map((memory) => {
+    const identity = byExport.get(memory.identifier);
+
+    if (
+      identity === undefined ||
+      (memory.x_omp_origin !== undefined && memory.x_omp_origin !== identity.origin)
+    )
+      throw new ApiError(400, "Inconsistent export identity mapping");
+
+    return { ...memory, identifier: identity.identifier, x_omp_origin: identity.origin };
+  });
 }

@@ -1,8 +1,9 @@
-import { z } from "zod";
-import { ApiError, type JsonInput, type Memory } from "./model.ts";
+import type { z } from "zod";
+import { ApiError, objectSchema, type JsonInput, type Memory } from "./model.ts";
 import { read, STORES, type Store } from "./storage.ts";
 import type { gatewaySearchResponse } from "./contracts.ts";
 import { storeSchema } from "./contracts.ts";
+import { pageInput, paginate } from "./pagination.ts";
 import { applicable, validateContext } from "./runtime.ts";
 
 export type GatewayHit = z.infer<typeof gatewaySearchResponse>["memories"][number];
@@ -29,26 +30,25 @@ export function searchMemories(memories: Memory[], query: string, now = Date.now
   );
 }
 
-const searchSchema = z.object({
-  query: z.string().max(4096).default(""),
-  limit: z.number().int().min(1).max(100).default(20),
-});
+export const searchInput = pageInput;
 
-export function searchInput(data: JsonInput) {
-  const parsed = searchSchema.safeParse(data);
+/** Always-active memories precede ordinary matches, then newest first with identity tie breakers. */
+const always = (memory: Memory) =>
+  objectSchema.safeParse(memory.activation).data?.mode === "always" ? 1 : 0;
 
-  if (!parsed.success)
-    throw new ApiError(
-      400,
-      "query must be a string up to 4096 characters and limit an integer from 1 to 100",
-    );
-
-  return parsed.data;
+export function compareMemories(a: Memory, b: Memory) {
+  return (
+    always(b) - always(a) ||
+    Date.parse(b.created_at) - Date.parse(a.created_at) ||
+    (a.x_omp_origin ?? "").localeCompare(b.x_omp_origin ?? "") ||
+    a.identifier.localeCompare(b.identifier)
+  );
 }
 
 /** Search every connected store. Keep store attribution even for copied identities. */
 export async function federatedSearch(artifacts: Artifacts, data: Record<string, JsonInput>) {
-  const { query, limit } = searchInput(data);
+  const input = searchInput(data);
+  const { query, as_of } = input;
   const context = data.context === undefined ? undefined : validateContext(data.context);
   const targets = data.store === undefined ? STORES : [targetStore(data.store)];
 
@@ -57,8 +57,10 @@ export async function federatedSearch(artifacts: Artifacts, data: Record<string,
       try {
         const { state, commit } = await read(artifacts, store);
 
-        const hits: GatewayHit[] = searchMemories(state.memories, query).flatMap((memory) =>
-          context === undefined || applicable(memory, context) ? [{ store, memory, commit }] : [],
+        const hits: GatewayHit[] = searchMemories(state.memories, query, as_of).flatMap((memory) =>
+          context === undefined || applicable(memory, context, as_of)
+            ? [{ store, memory, commit }]
+            : [],
         );
 
         return { store, ok: true, commit, hits };
@@ -75,17 +77,22 @@ export async function federatedSearch(artifacts: Artifacts, data: Record<string,
 
   const hits = responses
     .flatMap((r) => r.hits)
-    .toSorted(
-      (a, b) =>
-        b.memory.created_at.localeCompare(a.memory.created_at) ||
-        a.store.localeCompare(b.store) ||
-        a.memory.identifier.localeCompare(b.memory.identifier),
-    );
+    .toSorted((a, b) => compareMemories(a.memory, b.memory) || a.store.localeCompare(b.store));
+
+  const stores = responses.map((r) => ({
+    store: r.store,
+    ok: r.ok,
+    commit: r.commit,
+    error: r.error,
+  }));
+
+  const page = paginate(hits, input, { stores, context, targets });
 
   return {
-    memories: hits.slice(0, limit),
-    total: hits.length,
+    memories: page.items,
+    total: page.total,
+    next_cursor: page.next_cursor,
     partial: responses.some((r) => !r.ok),
-    stores: responses.map((r) => ({ store: r.store, ok: r.ok, commit: r.commit, error: r.error })),
+    stores,
   };
 }

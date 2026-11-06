@@ -50,8 +50,8 @@ export class OmpClient {
   read(identifier: string, origin?: string) {
     return this.request("fmp/read", readResponse, { identifier, origin });
   }
-  search(query: string, limit = 20) {
-    return this.request("fmp/search", searchResponse, { query, limit });
+  search(query: string, limit = 20, cursor?: string) {
+    return this.request("fmp/search", searchResponse, { query, limit, cursor });
   }
   update(identifier: string, patch: Partial<Memory>, origin?: string, if_version?: string) {
     return this.request("fmp/update", readResponse, { identifier, patch, origin, if_version });
@@ -59,8 +59,11 @@ export class OmpClient {
   delete(identifier: string, origin?: string) {
     return this.request("fmp/delete", deletedResponse, { identifier, origin });
   }
-  export() {
-    return this.request("fmp/read_inferences", exportResponse);
+  export(cursor?: string) {
+    return this.request(
+      "fmp/read_inferences" + (cursor === undefined ? "" : "?cursor=" + encodeURIComponent(cursor)),
+      exportResponse,
+    );
   }
   import(snapshot: Archive) {
     return this.request("fmp/import", importedResponse, snapshot);
@@ -95,7 +98,7 @@ export class OmpGateway {
       store,
     });
   }
-  search(query: string, limit = 20) {
-    return this.request("fmp/search", gatewaySearchResponse, { query, limit });
+  search(query: string, limit = 20, cursor?: string) {
+    return this.request("fmp/search", gatewaySearchResponse, { query, limit, cursor });
   }
 }

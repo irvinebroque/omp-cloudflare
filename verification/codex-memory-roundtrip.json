@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "base": "https://ompi-memory.roundtrip.workers.dev",
+  "sessions": 2,
+  "checks": [
+    "model MCP save",
+    "independent REST persistence",
+    "fresh model MCP search",
+    "fresh model MCP get",
+    "random value recalled without prompt leakage"
+  ],
+  "verifiedAt": "2026-11-06T16:13:45.752Z"
+}

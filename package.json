@@ -16,7 +16,9 @@
     "lint": "cf workers types && vp lint --deny-warnings",
     "lint:fix": "vp lint --fix",
     "format": "vp fmt",
-    "format:check": "vp fmt --check"
+    "format:check": "vp fmt --check",
+    "codex:roundtrip": "node scripts/codex-memory-roundtrip.ts",
+    "regression:roundtrip": "node scripts/regression-roundtrip.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.4.0",

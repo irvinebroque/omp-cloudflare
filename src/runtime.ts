@@ -107,9 +107,7 @@ export function validateContext(value: JsonInput): Context {
   return c;
 }
 
-export function applicable(memory: Memory, context: Context): boolean {
-  const now = Date.now();
-
+export function applicable(memory: Memory, context: Context, now = Date.now()): boolean {
   if (
     (memory.valid_from !== undefined && Date.parse(memory.valid_from) > now) ||
     (memory.valid_until !== undefined && Date.parse(memory.valid_until) <= now)
@@ -183,6 +181,12 @@ export function selectMemory(state: State, data: MemorySelection): Memory {
 
 export function addContribution(memory: Memory, contributor: string, contribution: string): Memory {
   const parsed = z.array(jsonValue).safeParse(memory.provenance);
+
+  if (memory.provenance !== undefined && !parsed.success)
+    throw new ApiError(
+      409,
+      "Unsupported provenance shape; preserve the original evidence before updating",
+    );
   const previous = parsed.success ? parsed.data : [];
 
   if (previous.length >= 100) throw new ApiError(413, "Prototype limit: 100 provenance entries");

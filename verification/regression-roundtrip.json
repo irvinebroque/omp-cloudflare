@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "base": "https://ompi-memory.roundtrip.workers.dev",
+  "verifiedAt": "2026-11-06T16:13:25.343Z",
+  "checks": [
+    "MCP preserves opaque identifiers, stubs, evidence, and extension metadata",
+    "unsupported provenance update returns 409 without altering evidence",
+    "MCP paginates both stores and prioritizes an old always-active preference",
+    "pagination detects concurrent store changes instead of silently skipping results",
+    "mixed-origin export/import preserves both identities and repeated copies are idempotent",
+    "multi-page live exports transfer every tombstone and block stale-copy resurrection"
+  ]
+}

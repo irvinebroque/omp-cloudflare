@@ -28,6 +28,7 @@ export const deletedResponse = z.object({
 
 export const searchResponse = z.object({
   memories: z.array(memorySchema),
+  next_cursor: z.string().nullable(),
   total: z.number(),
   commit: z.string().nullable(),
 });
@@ -36,12 +37,21 @@ export const gatewaySearchResponse = z.object({
   memories: z.array(
     z.object({ store: storeSchema, memory: memorySchema, commit: z.string().nullable() }),
   ),
+  next_cursor: z.string().nullable(),
   total: z.number(),
   partial: z.boolean(),
-  stores: z.array(z.object({ store: storeSchema, ok: z.boolean() })),
+  stores: z.array(
+    z.object({
+      store: storeSchema,
+      ok: z.boolean(),
+      commit: z.string().nullable().optional(),
+      error: z.string().optional(),
+    }),
+  ),
 });
 
 export const exportResponse = archiveSchema.extend({
+  next_cursor: z.string().nullable(),
   storage: z.object({ provider: z.string(), repo: z.string(), commit: z.string().nullable() }),
 });
 
