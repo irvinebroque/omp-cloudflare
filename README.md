@@ -64,7 +64,7 @@ const url = 'https://ompi-memory.roundtrip.workers.dev';
 const gateway = new OmpGateway(url);
 
 await gateway.remember({
-  identifier: 'demo-preference', // Supply an identifier to make retries idempotent.
+  identifier: 'demo-preference', // Stable identity; read after an uncertain write before retrying.
   body: 'The user prefers concise answers.',
   tags: ['preference'],
 }, 'personal');
