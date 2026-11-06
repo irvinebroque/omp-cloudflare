@@ -4,6 +4,8 @@ A TypeScript implementation inside the OMPI fork. It follows the **minimal memor
 
 Live demo: https://ompi-memory.roundtrip.workers.dev
 
+**Use it with Codex:** [installation and examples](codex/README.md). The deployed `/mcp` endpoint exposes six tools for recall, explicit personal/company writes, guarded revisions, and deletion. Run `npm run codex:setup` to register the server and install the checked-in memory skill.
+
 ## Architecture
 
 ```mermaid
@@ -28,7 +30,7 @@ Runtime: Cloudflare Workers. Storage and revision history: Cloudflare Artifacts.
 
 ## Run and deploy
 
-Requirements: Node.js 24.22+ and a `cf` login authorized for Workers and Artifacts. The lockfile pins CLI and build dependencies.
+Requirements: Node.js 24.22.x or a compatible later 24.x release, or Node.js 26.12+, and a `cf` login authorized for Workers and Artifacts. `.node-version` selects 24.22.0; the lockfile pins CLI and build dependencies.
 
 ```sh
 cd prototypes/cloudflare-memory
@@ -92,7 +94,7 @@ console.log(receipt.receipts);
 | POST | `/gateway/fmp/search` | `{ "query": "TypeScript", "limit": 20 }` — searches both stores |
 | POST | `/gateway/fmp/upload/inferences` | `{ "store": "personal", "memory": { "identifier": "note-1", "body": "Use TypeScript" } }` |
 | POST | `/gateway/fmp/read` | `{ "store": "company", "identifier": "note-1", "origin": "optional-origin" }` |
-| POST | `/gateway/fmp/update` | `{ "store": "personal", "identifier": "note-1", "patch": { "body": "Use Rust" } }` |
+| POST | `/gateway/fmp/update` | `{ "store": "personal", "identifier": "note-1", "if_version": "optional-token-from-read", "patch": { "body": "Use Rust" } }` |
 | POST | `/gateway/fmp/delete` | `{ "store": "personal", "identifier": "note-1" }` |
 | POST | `/gateway/fmp/import` | An exported archive plus `"store": "company"` |
 
@@ -121,7 +123,7 @@ The `x_omp_origin` extension preserves `(origin, identifier)` across multi-hop c
 
 Deletion removes a memory from the current view and exports and records a content-free tombstone. Tombstones block stale imports of that identity and propagate to another store when its snapshot is explicitly imported. **Git history retains old content: deletion is not secure erasure, forget, or automatic revocation of other copies.** No audit-profile conformance is claimed.
 
-Concurrent writes use Git fast-forward checks: a rejected push re-clones the current branch and reapplies the operation, up to four attempts. No force pushes. A failed storage operation returns 503; retry using the same identifier. Request bodies are capped at 1 MiB, each memory body at 16 KiB, and each store at 100 memories / 500 tombstones / 512 KiB of current state. Git history continues growing. This is a small demo, not a high-throughput memory database.
+Concurrent writes use Git fast-forward checks: a rejected push re-clones the current branch and reapplies the operation, up to four attempts. No force pushes. Reads return a per-memory `version` token; passing it as `if_version` to update/delete rejects stale edits with 409. MCP requires this guard, while existing REST callers may opt in. A storage failure returns 503; after an uncertain create, search/read before retrying because generated timestamps/identifiers do not guarantee idempotency. Request bodies are capped at 1 MiB, each memory body at 16 KiB, and each store at 100 memories / 500 tombstones / 512 KiB of current state. Git history continues growing. This is a small demo, not a high-throughput memory database.
 
 ## Verification
 
@@ -131,4 +133,4 @@ The saved [live verification report](verification/README.md) records the deploye
 
 ## Prototype boundaries
 
-No authentication, authorization, scope policy, tenant separation, semantic search, transcript/file ingestion, automatic consolidation, secure forget, or full audit compliance. Anyone who knows the demo URL can read and write both stores. Use sample data. The account and deployment names are intentionally committed; credentials are not.
+No authentication, authorization, scope policy, tenant separation, semantic search, transcript/file ingestion, automatic consolidation, secure forget, or full audit compliance. Runtime applicability/activation filtering is an experimental convention, not access control. Anyone who knows the demo URL can read and write both stores. Use sample data. The account and deployment names are intentionally committed; credentials are not.

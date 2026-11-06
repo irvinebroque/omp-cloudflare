@@ -17,9 +17,9 @@ export class OmpClient {
   }
   info() { return this.request<{store:Store;capabilities:string[];auth:string}>('fmp/info'); }
   remember(memory: MemoryInput) { return this.request<SavedMemory>('fmp/upload/inferences',{memory}); }
-  read(identifier: string, origin?: string) { return this.request<{memory:Memory;commit:string}>('fmp/read',{identifier,origin}); }
+  read(identifier: string, origin?: string) { return this.request<{memory:Memory;version:string;commit:string}>('fmp/read',{identifier,origin}); }
   search(query: string, limit = 20) { return this.request<{memories:Memory[];total:number;commit:string|null}>('fmp/search',{query,limit}); }
-  update(identifier: string, patch: Partial<Memory>, origin?: string) { return this.request<{memory:Memory;commit:string}>('fmp/update',{identifier,patch,origin}); }
+  update(identifier: string, patch: Partial<Memory>, origin?: string, if_version?: string) { return this.request<{memory:Memory;version:string;commit:string}>('fmp/update',{identifier,patch,origin,if_version}); }
   delete(identifier: string, origin?: string) { return this.request<{deleted:true;commit:string}>('fmp/delete',{identifier,origin}); }
   export() { return this.request<Archive & {storage:{provider:string;repo:string;commit:string|null}}>('fmp/read_inferences'); }
   import(snapshot: Archive) { return this.request<{receipts:Receipt[];commit:string}>('fmp/import',snapshot); }

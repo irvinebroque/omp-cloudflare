@@ -1,0 +1,11 @@
+interface:
+  display_name: "OMP Memory"
+  short_description: "Recall and save personal and company memory"
+  default_prompt: "Use $omp-memory to recall relevant preferences and company context for this task."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "omp-memory"
+      description: "Cloudflare-backed personal and company memory gateway"
+      transport: "streamable_http"
+      url: "https://ompi-memory.roundtrip.workers.dev/mcp"

@@ -1,0 +1,16 @@
+{
+  "url": "https://ompi-memory.roundtrip.workers.dev/mcp",
+  "checked_at": "2026-11-06T15:25:05.897Z",
+  "passed": 8,
+  "checks": [
+    "MCP initialize and six-tool discovery",
+    "Capability discovery and resource read",
+    "Writes route to separate stores; search returns summaries and get returns provenance",
+    "Repository rules do not leak through search or direct reads",
+    "Path and on-request activation filter correctly",
+    "Stale edits/deletes fail; unrelated writes do not invalidate per-memory versions",
+    "Invalid applicability and unknown tool arguments are rejected",
+    "Concurrent edits from the same version produce one winner and one conflict"
+  ],
+  "cleanup": "Removed test memories from current views; history and tombstones retained."
+}

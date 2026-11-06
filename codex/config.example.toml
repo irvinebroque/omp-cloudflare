@@ -1,0 +1,7 @@
+# Optional manual alternative to `npm run codex:setup`.
+# Merge this table into ~/.codex/config.toml; do not replace the whole file.
+[mcp_servers.omp-memory]
+url = "https://ompi-memory.roundtrip.workers.dev/mcp"
+startup_timeout_sec = 30
+tool_timeout_sec = 90
+

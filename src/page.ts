@@ -5,7 +5,7 @@ export const page = `<!doctype html><html lang="en"><meta charset="utf-8"><meta 
 <label for="store">Write / export target</label><select id="store"><option>personal</option><option>company</option></select>
 <label for="note">Remember something</label><textarea id="note" rows="3" placeholder="The project uses TypeScript."></textarea><button id="save">Remember</button>
 <label for="query">Search memory</label><input id="query" placeholder="TypeScript"><button id="search">Search both stores</button><button id="export">Export JSON</button><button id="transfer">Copy to other store</button><button id="history">View Git history</button>
-<p id="status" role="status"></p><pre id="result">Loading capabilities…</pre><p>API: <a href="/fmp/info">/fmp/info</a> · <a href="https://github.com/irvinebroque/Open-Memory-Protocol/tree/main/prototypes/cloudflare-memory">Source & TypeScript client</a></p>
+<p id="status" role="status"></p><pre id="result">Loading capabilities…</pre><p>API: <a href="/fmp/info">/fmp/info</a> · <a href="https://github.com/irvinebroque/Open-Memory-Protocol/tree/main/prototypes/cloudflare-memory">Source & TypeScript client</a> · <a href="https://github.com/irvinebroque/Open-Memory-Protocol/blob/main/prototypes/cloudflare-memory/codex/README.md">Connect Codex</a></p>
 <script>
 const el=id=>document.getElementById(id);const store=()=>el('store').value;
 async function api(path,data,s=store()){const r=await fetch('/stores/'+s+'/'+path,data?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)}:{});const v=await r.json();if(!r.ok)throw Error(v.error||r.status);return v}

@@ -1,7 +1,9 @@
-import { ApiError, archive, key, merge, object, text, timestamp, validateMemory, type Memory, type Tombstone } from './model.ts';
+import { ApiError, archive, key, merge, object, text, timestamp, validateMemory, type Tombstone } from './model.ts';
 import { mutate, read, STORES, type Store } from './storage.ts';
 import { page } from './page.ts';
 import { federatedSearch, targetStore, searchInput, searchMemories } from './gateway.ts';
+import { addContribution, applicable, memoryVersion, selectMemory, validateContext, validateConventions } from './runtime.ts';
+import { handleMcp } from './mcp.ts';
 
 const json = (value: unknown, status = 200) => Response.json(value, {status, headers:{'cache-control':'no-store'}});
 async function body(request: Request): Promise<Record<string, unknown>> {
@@ -20,18 +22,11 @@ async function body(request: Request): Promise<Record<string, unknown>> {
   try { return object(JSON.parse(new TextDecoder().decode(bytes))); }
   catch (error) { if (error instanceof ApiError) throw error; throw new ApiError(400, 'Invalid JSON'); }
 }
-function select(memories: Memory[], data: Record<string, unknown>, fallback: string): Memory {
-  const identifier = text(data.identifier, 'identifier');
-  const found = memories.filter(m => m.identifier === identifier && (!data.origin || m.x_omp_origin === data.origin));
-  if (!found.length) throw new ApiError(404, 'Memory not found');
-  if (found.length > 1) throw new ApiError(409, 'Ambiguous identifier; provide origin');
-  return found[0];
-}
 async function route(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   if (request.method === 'GET' && url.pathname === '/') return new Response(page, {headers:{'content-type':'text/html; charset=utf-8','content-security-policy':"default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'",'x-content-type-options':'nosniff'}});
   if (request.method === 'GET' && url.pathname === '/health') return json({ok:true, storage:'Cloudflare Artifacts'});
-  if (request.method === 'GET' && url.pathname === '/fmp/info') return json({name:'OMP on Cloudflare', version:'0.1.0', draft:'OMP editors v0.2 / FMP proposal', profiles:['minimal'], auth:'none (public prototype)', stores:STORES, gateway:'/gateway/info', namespace:'ompi-memory-prototype', storage:'Cloudflare Artifacts Git repositories', capabilities:['remember','read','search','update','delete','export','import','history'], unsupported:['audit','secure-forget','scope-enforcement','transcripts','files','move']});
+  if (request.method === 'GET' && url.pathname === '/fmp/info') return json({name:'OMP on Cloudflare', version:'0.2.0', draft:'OMP editors v0.2 / FMP proposal', experimental_binding:'omp-cloudflare-mcp/0.1', mcp:'/mcp', profiles:['minimal'], auth:'none (public prototype)', stores:STORES, gateway:'/gateway/info', namespace:'ompi-memory-prototype', storage:'Cloudflare Artifacts Git repositories', capabilities:['remember','read','search','update','delete','export','import','history','mcp','conditional-update','runtime-applicability'], unsupported:['audit','secure-forget','scope-enforcement','automatic-hooks','realtime-sync','transcripts','files','move']});
   if (request.method === 'GET' && url.pathname === '/gateway/info') return json({name:'OMP memory gateway',connected_stores:STORES,search:'/gateway/fmp/search',write:'/gateway/fmp/upload/inferences',routing:{field:'store',default:'personal',allowed:STORES},auth:'none (public prototype)'});
   if (request.method === 'POST' && url.pathname.startsWith('/gateway/fmp/')) {
     const data = await body(request);
@@ -61,29 +56,38 @@ async function route(request: Request, env: Env): Promise<Response> {
   const data = await body(request);
   if (path === 'fmp/read') {
     const {state,commit} = await read(env.ARTIFACTS,store);
-    return json({memory:select(state.memories,data,state.origin),commit});
+    const memory = selectMemory(state,data);
+    if (data.context !== undefined && !applicable(memory,validateContext(data.context))) throw new ApiError(404,'Memory is not applicable in this context');
+    return json({memory,version:memoryVersion(memory),commit});
   }
   if (path === 'fmp/search') {
     const {query,limit}=searchInput(data);
     const {state,commit} = await read(env.ARTIFACTS,store);
-    const memories=searchMemories(state.memories,query);
+    const context=data.context === undefined ? undefined : validateContext(data.context);
+    const memories=searchMemories(state.memories,query).filter(m=>!context || applicable(m,context));
     return json({memories:memories.slice(0,limit),total:memories.length,commit});
   }
   if (path === 'fmp/upload/inferences') {
-    const memory = validateMemory({identifier:crypto.randomUUID(),media_type:'text/plain',created_at:new Date().toISOString(),...object(data.memory)});
+    let memory = validateMemory({identifier:crypto.randomUUID(),media_type:'text/plain',created_at:new Date().toISOString(),...object(data.memory)});
+    validateConventions(memory);
+    if (data.contributor !== undefined) memory = addContribution(memory,text(data.contributor,'contributor'),'authored');
     if (memory.x_omp_origin) throw new ApiError(400, 'Use import to ingest memories from another origin');
     const saved = await mutate(env.ARTIFACTS,store,`Remember ${memory.identifier}`,state => ({receipts:merge(state,[memory]),memory:{...memory,x_omp_origin:state.origin}}));
-    return json({...saved.result,commit:saved.commit}, saved.result.receipts[0].status === 'rejected' ? 409 : 200);
+    return json({...saved.result,version:memoryVersion(saved.result.memory),commit:saved.commit}, saved.result.receipts[0].status === 'rejected' ? 409 : 200);
   }
   if (path === 'fmp/update') {
     const result = await mutate(env.ARTIFACTS,store,`Update memory`,state => {
-      const old = select(state.memories,data,state.origin);
+      const old = selectMemory(state,data);
+      if (data.context !== undefined && !applicable(old,validateContext(data.context))) throw new ApiError(404,'Memory is not applicable in this context');
+      if (data.if_version !== undefined && text(data.if_version,'if_version') !== memoryVersion(old)) throw new ApiError(409,'Memory changed; read it again and reconcile before retrying');
       if (old.x_omp_origin !== state.origin) throw new ApiError(409, 'Imported memories are immutable here; create a new local memory');
       const patch = object(data.patch);
       for (const field of ['identifier','created_at','x_omp_origin']) if (field in patch) throw new ApiError(400, `Cannot patch ${field}`);
-      const memory = validateMemory({...old,...patch,updated_at:new Date().toISOString()});
+      let memory = validateMemory({...old,...patch,updated_at:new Date().toISOString()});
+      validateConventions(memory);
+      if (data.contributor !== undefined) memory=addContribution(memory,text(data.contributor,'contributor'),'corrected');
       state.memories = state.memories.map(m => key(m,state.origin) === key(old,state.origin) ? memory : m);
-      merge(state,[]); return {memory};
+      merge(state,[]); return {memory,version:memoryVersion(memory)};
     });
     return json({...result.result,commit:result.commit});
   }
@@ -95,7 +99,9 @@ async function route(request: Request, env: Env): Promise<Response> {
         const deleted = state.tombstones.find(t => t.identifier === identifier && (!data.origin || t.origin === data.origin));
         if (deleted) return {deleted:true,tombstone:deleted};
       }
-      const m = select(state.memories,data,state.origin);
+      const m = selectMemory(state,data);
+      if (data.context !== undefined && !applicable(m,validateContext(data.context))) throw new ApiError(404,'Memory is not applicable in this context');
+      if (data.if_version !== undefined && text(data.if_version,'if_version') !== memoryVersion(m)) throw new ApiError(409,'Memory changed; read it again before deleting');
       const tombstone = {origin:m.x_omp_origin ?? state.origin,identifier:m.identifier,deleted_at:new Date().toISOString()};
       merge(state,[],[tombstone]); return {deleted:true,tombstone};
     });
@@ -116,8 +122,11 @@ async function route(request: Request, env: Env): Promise<Response> {
   throw new ApiError(404, 'Endpoint not supported');
 }
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    try { return await route(request,env); }
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    try {
+      if (new URL(request.url).pathname === '/mcp') return await handleMcp(request,env,ctx,inner=>route(inner,env));
+      return await route(request,env);
+    }
     catch (error) {
       if (error instanceof ApiError) return json({error:error.message},error.status);
       console.error(JSON.stringify({event:'request_failed',message:error instanceof Error ? error.message : 'Unknown error'}));

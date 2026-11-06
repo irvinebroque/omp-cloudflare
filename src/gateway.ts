@@ -1,5 +1,6 @@
 import { ApiError, text, type Memory } from './model.ts';
 import { read, STORES, type Store } from './storage.ts';
+import { applicable, validateContext } from './runtime.ts';
 
 export interface GatewayHit { store: Store; memory: Memory; commit: string | null }
 export function targetStore(value: unknown): Store {
@@ -21,10 +22,12 @@ export function searchInput(data: Record<string, unknown>): {query:string;limit:
 /** Search every connected store. Keep store attribution even for copied identities. */
 export async function federatedSearch(artifacts: Artifacts, data: Record<string, unknown>) {
   const {query,limit}=searchInput(data);
-  const responses=await Promise.all(STORES.map(async store => {
+  const context = data.context === undefined ? undefined : validateContext(data.context);
+  const targets = data.store === undefined ? STORES : [targetStore(data.store)];
+  const responses=await Promise.all(targets.map(async store => {
     try {
       const {state,commit}=await read(artifacts,store);
-      return {store,ok:true as const,commit,hits:searchMemories(state.memories,query).map(memory=>({store,memory,commit}))};
+      return {store,ok:true as const,commit,hits:searchMemories(state.memories,query).filter(memory=>!context || applicable(memory,context)).map(memory=>({store,memory,commit}))};
     } catch {
       return {store,ok:false as const,error:'Store unavailable',hits:[] as GatewayHit[]};
     }
