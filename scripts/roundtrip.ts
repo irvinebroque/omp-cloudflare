@@ -3,10 +3,12 @@ import { OmpClient, OmpGateway } from "../sdk/client.ts";
 
 const base = process.argv[2];
 
-if (!base) throw new Error("Usage: npm run roundtrip -- https://your-worker.workers.dev");
+if (base === undefined)
+  throw new Error("Usage: npm run roundtrip -- https://your-worker.workers.dev");
 
 const personal = new OmpClient(base, "personal"),
   destination = new OmpClient(base, "company");
+
 const id = `smoke-${crypto.randomUUID()}`;
 const checks: string[] = [];
 
@@ -28,7 +30,7 @@ const saved = await gateway.remember({
 
 assert.equal(saved.routed_to, "personal");
 
-assert.equal(saved.receipts[0].status, "accepted");
+assert.equal(saved.receipts.at(0)?.status, "accepted");
 
 assert.match(saved.commit, /^[a-f0-9]{40}$/);
 
@@ -43,6 +45,7 @@ assert.equal((await personal.search(id)).memories.length, 1);
 pass("search finds saved memory");
 
 const companyId = `${id}-company`;
+
 const companySaved = await gateway.remember(
   { identifier: companyId, body: `Company example ${id}: releases on Friday.` },
   "company",
@@ -69,31 +72,34 @@ pass("gateway routes personal/company writes into separate Artifacts repositorie
 pass("one gateway search returns attributed results from both connected stores");
 
 const snapshot = await personal.export();
+
 const one = {
   ...snapshot,
   memories: snapshot.memories.filter((m) => m.identifier === id),
   tombstones: [],
 };
+
 const imported = await destination.import(one);
 
-assert.equal(imported.receipts[0].status, "accepted");
+assert.equal(imported.receipts.at(0)?.status, "accepted");
 
 assert.deepEqual((await destination.read(id)).memory, saved.memory);
 
 pass("cross-store export/import preserves all fields and origin");
 
-assert.equal((await destination.import(one)).receipts[0].status, "unchanged");
+assert.equal((await destination.import(one)).receipts.at(0)?.status, "unchanged");
 
 pass("repeated import is idempotent");
 
 const back = await destination.export();
+
 const backOne = {
   ...back,
   memories: back.memories.filter((m) => m.identifier === id),
   tombstones: [],
 };
 
-assert.equal((await personal.import(backOne)).receipts[0].status, "unchanged");
+assert.equal((await personal.import(backOne)).receipts.at(0)?.status, "unchanged");
 
 pass("export back to original store preserves identity");
 
@@ -102,7 +108,7 @@ const conflict = {
   memories: one.memories.map((m) => ({ ...m, body: "Conflicting body" })),
 };
 
-assert.equal((await destination.import(conflict)).receipts[0].status, "rejected");
+assert.equal((await destination.import(conflict)).receipts.at(0)?.status, "rejected");
 
 pass("identity conflict rejected without data loss");
 
@@ -122,14 +128,17 @@ await Promise.all(
   ids.map((identifier) => personal.remember({ identifier, body: "Concurrency sample" })),
 );
 
-for (const identifier of ids)
-  assert.equal((await personal.read(identifier)).memory.identifier, identifier);
+await Promise.all(
+  ids.map(async (identifier) => {
+    assert.equal((await personal.read(identifier)).memory.identifier, identifier);
+  }),
+);
 
 pass("concurrent writes survive without lost updates");
 
 await destination.delete(id);
 
-assert.equal((await destination.import(one)).receipts[0].reason, "deleted_identity");
+assert.equal((await destination.import(one)).receipts.at(0)?.reason, "deleted_identity");
 
 pass("deleted identity cannot return through stale import");
 
@@ -137,7 +146,7 @@ await personal.delete(id);
 
 await destination.delete(companyId);
 
-for (const identifier of ids) await personal.delete(identifier);
+await Promise.all(ids.map((identifier) => personal.delete(identifier)));
 
 const history = await personal.history();
 

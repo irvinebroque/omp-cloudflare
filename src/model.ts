@@ -1,130 +1,167 @@
-/** OMP editors' draft v0.2 (PR #13), minimal profile; extensions are preserved. */
-export interface Memory {
-  identifier: string;
-  media_type: string;
-  created_at: string;
-  body: string;
-  title?: string;
-  tags?: string[];
-  valid_from?: string;
-  valid_until?: string;
-  x_omp_origin?: string;
-  [extension: string]: unknown;
-}
+import { z } from "zod";
 
-export interface Tombstone {
-  origin: string;
-  identifier: string;
-  deleted_at: string;
-}
+export const jsonValue = z.json();
 
-export interface Archive {
-  manifest: {
-    protocol_version: "0.2";
-    profiles: string[];
-    origin: string;
-    exported_at: string;
-    selection: "snapshot";
-    intent: "copy";
-    media_types: string[];
-  };
-  memories: Memory[];
-  tombstones: Tombstone[];
-}
+export type Json = z.infer<typeof jsonValue>;
 
-export interface State {
-  origin: string;
-  memories: Memory[];
-  tombstones: Tombstone[];
-}
+export type JsonInput =
+  | Json
+  | undefined
+  | { readonly [key: string]: JsonInput }
+  | readonly JsonInput[];
 
-export interface Receipt {
-  identifier: string;
-  origin: string;
-  status: "accepted" | "unchanged" | "rejected";
-  reason?: string;
-}
+export const objectSchema = z.record(z.string(), jsonValue);
+
+export const timestampSchema = z
+  .string()
+  .max(64)
+  .regex(/^\d{4}-\d\d-\d\dT.*(?:Z|[+-]\d\d:\d\d)$/u)
+  .refine((value) => Number.isFinite(Date.parse(value)), "Invalid timestamp");
+
+const label = z
+  .string()
+  .min(1)
+  .max(256)
+  .refine((value) => value.trim().length > 0);
+
+/** OMP editors' draft v0.2 minimal profile; arbitrary JSON extensions survive parsing. */
+export const memoryFieldsSchema = z
+  .object({
+    identifier: label,
+    media_type: z
+      .string()
+      .min(1)
+      .max(128)
+      .refine((value) => value.trim().length > 0),
+    created_at: timestampSchema,
+    body: z
+      .string()
+      .refine((value) => new TextEncoder().encode(value).length <= 16384, "body exceeds 16 KiB"),
+    title: label.optional(),
+    tags: z.array(z.string().max(128)).max(32).optional(),
+    valid_from: timestampSchema.optional(),
+    valid_until: timestampSchema.optional(),
+    x_omp_origin: label.optional(),
+  })
+  .catchall(jsonValue);
+
+export const memorySchema = memoryFieldsSchema.refine(
+  (memory) =>
+    memory.valid_from === undefined ||
+    memory.valid_until === undefined ||
+    Date.parse(memory.valid_from) < Date.parse(memory.valid_until),
+  "valid_until must follow valid_from",
+);
+
+export type Memory = z.infer<typeof memorySchema>;
+
+export const tombstoneSchema = z.object({
+  origin: label,
+  identifier: label,
+  deleted_at: timestampSchema,
+});
+
+export type Tombstone = z.infer<typeof tombstoneSchema>;
+
+export const stateSchema = z.object({
+  origin: label,
+  memories: z.array(memorySchema).max(100),
+  tombstones: z.array(tombstoneSchema).max(500),
+});
+
+export type State = z.infer<typeof stateSchema>;
+
+export const archiveSchema = z.object({
+  manifest: z.object({
+    protocol_version: z.literal("0.2"),
+    profiles: z.tuple([z.literal("minimal")]),
+    origin: label,
+    exported_at: timestampSchema,
+    selection: z.literal("snapshot"),
+    intent: z.literal("copy"),
+    media_types: z.array(z.string()),
+  }),
+  memories: z.array(memorySchema).max(100),
+  tombstones: z.array(tombstoneSchema).max(500).default([]),
+});
+
+export type Archive = z.infer<typeof archiveSchema>;
+
+export const receiptSchema = z.object({
+  identifier: label,
+  origin: label,
+  status: z.enum(["accepted", "unchanged", "rejected"]),
+  reason: z.string().optional(),
+});
+
+export type Receipt = z.infer<typeof receiptSchema>;
 
 export class ApiError extends Error {
-  status: number;
+  readonly status: number;
   constructor(status: number, message: string) {
     super(message);
     this.status = status;
   }
 }
 
-export function object(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    throw new ApiError(400, "Expected a JSON object");
+export function object(value: JsonInput) {
+  const result = objectSchema.safeParse(value);
 
-  return value as Record<string, unknown>;
+  if (!result.success) throw new ApiError(400, "Expected a JSON object");
+
+  return result.data;
 }
 
-export function text(value: unknown, name: string, max = 256): string {
-  if (typeof value !== "string" || !value.trim() || value.length > max)
-    throw new ApiError(400, `${name} must be a nonempty string of at most ${max} characters`);
+export function text(value: JsonInput, name: string, max = 256) {
+  const result = z
+    .string()
+    .min(1)
+    .max(max)
+    .refine((item) => item.trim().length > 0)
+    .safeParse(value);
 
-  return value;
+  if (!result.success)
+    throw new ApiError(400, name + " must be a nonempty string of at most " + max + " characters");
+
+  return result.data;
 }
 
-export function timestamp(value: unknown, name: string): string {
-  const result = text(value, name, 64);
+export function timestamp(value: JsonInput, name: string) {
+  const result = timestampSchema.safeParse(value);
 
-  if (
-    !/^\d{4}-\d\d-\d\dT.*(?:Z|[+-]\d\d:\d\d)$/.test(result) ||
-    !Number.isFinite(Date.parse(result))
-  )
-    throw new ApiError(400, `${name} must be an ISO 8601 timestamp with timezone`);
+  if (!result.success)
+    throw new ApiError(400, name + " must be an ISO 8601 timestamp with timezone");
 
-  return result;
+  return result.data;
 }
 
-export function validateMemory(value: unknown): Memory {
-  const m = object(value);
-  text(m.identifier, "identifier");
-  text(m.media_type, "media_type", 128);
-  timestamp(m.created_at, "created_at");
+export function validateMemory(value: JsonInput): Memory {
+  const result = memorySchema.safeParse(value);
 
-  if (typeof m.body !== "string" || new TextEncoder().encode(m.body).length > 16384)
-    throw new ApiError(400, "body must be a string of at most 16 KiB");
+  if (!result.success) throw new ApiError(400, z.prettifyError(result.error));
 
-  if (
-    m.tags !== undefined &&
-    (!Array.isArray(m.tags) ||
-      m.tags.length > 32 ||
-      m.tags.some((t) => typeof t !== "string" || t.length > 128))
-  )
-    throw new ApiError(400, "tags must be up to 32 short strings");
-
-  if (m.title !== undefined) text(m.title, "title");
-
-  if (m.x_omp_origin !== undefined) text(m.x_omp_origin, "x_omp_origin");
-
-  for (const key of ["valid_from", "valid_until"]) if (m[key] !== undefined) timestamp(m[key], key);
-
-  if (
-    m.valid_from &&
-    m.valid_until &&
-    Date.parse(String(m.valid_from)) >= Date.parse(String(m.valid_until))
-  )
-    throw new ApiError(400, "valid_until must follow valid_from");
-
-  return m as Memory;
+  return result.data;
 }
 
-export function key(m: { identifier: string; x_omp_origin?: string }, fallback: string): string {
-  return JSON.stringify([m.x_omp_origin ?? fallback, m.identifier]);
+export interface Identity {
+  identifier: string;
+  x_omp_origin?: string;
 }
 
-export function stable(value: unknown): string {
-  if (Array.isArray(value)) return "[" + value.map(stable).join(",") + "]";
+export function key(memory: Identity, fallback: string) {
+  return JSON.stringify([memory.x_omp_origin ?? fallback, memory.identifier]);
+}
 
-  if (value && typeof value === "object")
+function canonical(value: Json): string {
+  if (Array.isArray(value)) return "[" + value.map((item) => canonical(item)).join(",") + "]";
+  const record = objectSchema.safeParse(value);
+
+  if (record.success)
     return (
       "{" +
-      Object.entries(value)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([k, v]) => JSON.stringify(k) + ":" + stable(v))
+      Object.entries(record.data)
+        .toSorted(([a], [b]) => a.localeCompare(b))
+        .map(([name, item]) => JSON.stringify(name) + ":" + canonical(item))
         .join(",") +
       "}"
     );
@@ -132,48 +169,58 @@ export function stable(value: unknown): string {
   return JSON.stringify(value);
 }
 
-export function merge(state: State, memories: Memory[], tombstones: Tombstone[] = []): Receipt[] {
-  const all = new Map(state.memories.map((m) => [key(m, state.origin), m]));
+/** Canonical JSON ignores absent optional fields, just as persistent JSON does. */
+export function stable(value: JsonInput): string {
+  return canonical(jsonValue.parse(JSON.parse(JSON.stringify(value) ?? "null")));
+}
+
+export function merge(
+  state: State,
+  memories: readonly Memory[],
+  tombstones: readonly Tombstone[] = [],
+): Receipt[] {
+  const all = new Map(state.memories.map((memory) => [key(memory, state.origin), memory]));
+
   const deleted = new Map(
-    state.tombstones.map((t) => [
-      key({ identifier: t.identifier, x_omp_origin: t.origin }, state.origin),
-      t,
+    state.tombstones.map((item) => [
+      key({ identifier: item.identifier, x_omp_origin: item.origin }, state.origin),
+      item,
     ]),
   );
 
-  for (const t of tombstones) {
-    const k = key({ identifier: t.identifier, x_omp_origin: t.origin }, state.origin);
-    deleted.set(k, t);
-    all.delete(k);
+  for (const item of tombstones) {
+    const identity = key({ identifier: item.identifier, x_omp_origin: item.origin }, state.origin);
+    deleted.set(identity, item);
+    all.delete(identity);
   }
 
-  const receipts = memories.map((memory) => {
-    const m = { ...memory, x_omp_origin: memory.x_omp_origin ?? state.origin };
-    const k = key(m, state.origin);
-    const origin = m.x_omp_origin;
+  const receipts = memories.map((memory): Receipt => {
+    const item = { ...memory, x_omp_origin: memory.x_omp_origin ?? state.origin };
+    const identity = key(item, state.origin);
+    const origin = item.x_omp_origin;
 
-    if (deleted.has(k))
+    if (deleted.has(identity))
       return {
-        identifier: m.identifier,
+        identifier: item.identifier,
         origin,
-        status: "rejected" as const,
+        status: "rejected",
         reason: "deleted_identity",
       };
-    const previous = all.get(k);
+    const previous = all.get(identity);
 
-    if (previous && stable(previous) !== stable(m))
+    if (previous !== undefined && stable(previous) !== stable(item))
       return {
-        identifier: m.identifier,
+        identifier: item.identifier,
         origin,
-        status: "rejected" as const,
+        status: "rejected",
         reason: "identity_conflict; use update for a local memory",
       };
-    all.set(k, m);
+    all.set(identity, item);
 
     return {
-      identifier: m.identifier,
+      identifier: item.identifier,
       origin,
-      status: previous ? ("unchanged" as const) : ("accepted" as const),
+      status: previous === undefined ? "accepted" : "unchanged",
     };
   });
 
@@ -197,7 +244,7 @@ export function archive(state: State): Archive {
       exported_at: new Date().toISOString(),
       selection: "snapshot",
       intent: "copy",
-      media_types: [...new Set(state.memories.map((m) => m.media_type))],
+      media_types: [...new Set(state.memories.map((memory) => memory.media_type))],
     },
     memories: state.memories,
     tombstones: state.tombstones,

@@ -1,107 +1,108 @@
 import { createHash } from "node:crypto";
 import picomatch from "picomatch";
-import { ApiError, object, stable, text, type Memory, type State } from "./model.ts";
+import { z } from "zod";
+import {
+  ApiError,
+  jsonValue,
+  stable,
+  text,
+  type JsonInput,
+  type Memory,
+  type State,
+} from "./model.ts";
 
 /** Local experimental conventions inspired by issue #22; not a settled OMP schema. */
-export interface Context {
-  repository?: string;
-  directory?: string;
-  paths?: string[];
-  explicit_request?: boolean;
-}
+export const contextSchema = z.object({
+  repository: z.string().max(1024).optional(),
+  directory: z.string().max(1024).optional(),
+  paths: z.array(z.string().max(1024)).max(100).optional(),
+  explicit_request: z.boolean().optional(),
+});
 
-export interface Applicability {
-  level: "user" | "organization" | "repository" | "directory" | "paths";
-  repository?: string;
-  directory?: string;
-  globs?: string[];
-}
+export type Context = z.infer<typeof contextSchema>;
 
-export interface Activation {
-  mode: "always" | "paths" | "relevant" | "on_request";
-  globs?: string[];
-  description?: string;
-}
+const patterns = z.array(z.string().min(1).max(512)).min(1).max(32);
+const repository = z.string().min(1).max(1024);
+
+const applicabilitySchema = z.discriminatedUnion("level", [
+  z.object({ level: z.literal("user") }),
+  z.object({ level: z.literal("organization") }),
+  z.object({ level: z.literal("repository"), repository }),
+  z.object({ level: z.literal("directory"), repository, directory: z.string().min(1).max(1024) }),
+  z.object({ level: z.literal("paths"), repository, globs: patterns }),
+]);
+
+const activationSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("always") }),
+  z.object({ mode: z.literal("paths"), globs: patterns }),
+  z.object({ mode: z.literal("relevant"), description: z.string().min(1).max(1024).optional() }),
+  z.object({ mode: z.literal("on_request") }),
+]);
 
 export function repositoryKey(value: string): string {
-  const candidate = value.replace(/^git@([^:]+):/, "https://$1/");
+  const candidate = value.replace(/^git@([^:]+):/u, "https://$1/");
 
   try {
     const url = new URL(candidate);
 
     if (!["https:", "http:", "ssh:"].includes(url.protocol)) throw new Error();
 
-    return `${url.host.toLowerCase()}${url.pathname.replace(/\/$/, "").replace(/\.git$/, "")}`;
+    return url.host.toLowerCase() + url.pathname.replace(/\/$/u, "").replace(/\.git$/u, "");
   } catch {
     throw new ApiError(400, "repository must be a remote URL or git@host:path");
   }
 }
 
 export function relativePath(value: string): string {
-  const path = value.replaceAll("\\", "/").replace(/^\.\//, "").replace(/\/$/, "");
+  const path = value.replaceAll("\\", "/").replace(/^\.\//u, "").replace(/\/$/u, "");
 
-  if (path.startsWith("/") || /^[a-z]:/i.test(path) || path.split("/").includes(".."))
+  if (path.startsWith("/") || /^[a-z]:/iu.test(path) || path.split("/").includes(".."))
     throw new ApiError(400, "Paths must be repository-relative, without ..");
 
   return path === "." ? "" : path;
 }
 
-function globs(value: unknown): string[] {
-  if (!Array.isArray(value) || value.length === 0 || value.length > 32)
-    throw new ApiError(400, "globs must contain 1 to 32 patterns");
+function conventions(memory: Memory) {
+  const applies = applicabilitySchema.optional().safeParse(memory.applies_to);
+  const activation = activationSchema.optional().safeParse(memory.activation);
 
-  return value.map((v) => relativePath(text(v, "glob", 512)));
+  if (!applies.success || !activation.success)
+    throw new ApiError(400, "Invalid applies_to or activation convention");
+  const a = applies.data;
+
+  if (a !== undefined && a.level !== "user" && a.level !== "organization")
+    repositoryKey(a.repository);
+
+  if (a?.level === "directory") relativePath(a.directory);
+
+  if (a?.level === "paths") a.globs.forEach(relativePath);
+
+  if (activation.data?.mode === "paths") activation.data.globs.forEach(relativePath);
+
+  if (
+    activation.data?.mode === "relevant" &&
+    activation.data.description === undefined &&
+    memory.title === undefined
+  )
+    throw new ApiError(400, "Relevant activation needs a description or title");
+
+  return { applies: a, activation: activation.data };
 }
 
 export function validateConventions(memory: Memory): void {
-  if (memory.applies_to !== undefined) {
-    const a = object(memory.applies_to);
-
-    if (!["user", "organization", "repository", "directory", "paths"].includes(String(a.level)))
-      throw new ApiError(400, "Unsupported applies_to.level");
-
-    if (!["user", "organization"].includes(String(a.level)))
-      repositoryKey(text(a.repository, "applies_to.repository", 1024));
-
-    if (a.level === "directory") relativePath(text(a.directory, "applies_to.directory", 1024));
-
-    if (a.level === "paths") globs(a.globs);
-  }
-
-  if (memory.activation !== undefined) {
-    const a = object(memory.activation);
-
-    if (!["always", "paths", "relevant", "on_request"].includes(String(a.mode)))
-      throw new ApiError(400, "Unsupported activation.mode");
-
-    if (a.mode === "paths") globs(a.globs);
-
-    if (a.mode === "relevant" && !a.description && !memory.title)
-      throw new ApiError(400, "Relevant activation needs a description or title");
-
-    if (a.description !== undefined) text(a.description, "activation.description", 1024);
-  }
+  conventions(memory);
 }
 
-export function validateContext(value: unknown): Context {
-  const c = object(value);
+export function validateContext(value: JsonInput): Context {
+  const parsed = contextSchema.safeParse(value);
 
-  if (c.repository !== undefined) repositoryKey(text(c.repository, "context.repository", 1024));
+  if (!parsed.success) throw new ApiError(400, "Invalid runtime context");
+  const c = parsed.data;
 
-  if (c.directory !== undefined) relativePath(text(c.directory, "context.directory", 1024));
+  if (c.repository !== undefined) repositoryKey(c.repository);
 
-  if (
-    c.paths !== undefined &&
-    (!Array.isArray(c.paths) ||
-      c.paths.length > 100 ||
-      c.paths.some((p) => typeof p !== "string" || p.length > 1024))
-  )
-    throw new ApiError(400, "context.paths must be up to 100 relative paths");
-
-  for (const p of (c.paths as string[]) ?? []) relativePath(p);
-
-  if (c.explicit_request !== undefined && typeof c.explicit_request !== "boolean")
-    throw new ApiError(400, "explicit_request must be boolean");
+  if (c.directory !== undefined) relativePath(c.directory);
+  c.paths?.forEach(relativePath);
 
   return c;
 }
@@ -110,30 +111,33 @@ export function applicable(memory: Memory, context: Context): boolean {
   const now = Date.now();
 
   if (
-    (memory.valid_from && Date.parse(memory.valid_from) > now) ||
-    (memory.valid_until && Date.parse(memory.valid_until) <= now)
+    (memory.valid_from !== undefined && Date.parse(memory.valid_from) > now) ||
+    (memory.valid_until !== undefined && Date.parse(memory.valid_until) <= now)
   )
     return false;
-
   // Unknown imported applicability must not silently turn into a global instruction.
+  let parsed: ReturnType<typeof conventions>;
+
   try {
-    validateConventions(memory);
+    parsed = conventions(memory);
   } catch {
     return false;
   }
 
-  const a = memory.applies_to as Applicability | undefined;
+  const a = parsed.applies;
   const paths = (context.paths ?? []).map(relativePath);
-  const matches = (patterns: string[]) =>
-    paths.some((path) => picomatch(patterns, { dot: true })(path));
+  const matches = (globs: string[]) => paths.some((path) => picomatch(globs, { dot: true })(path));
 
-  if (a && !["user", "organization"].includes(a.level)) {
-    if (!context.repository || repositoryKey(context.repository) !== repositoryKey(a.repository!))
+  if (a !== undefined && a.level !== "user" && a.level !== "organization") {
+    if (
+      context.repository === undefined ||
+      repositoryKey(context.repository) !== repositoryKey(a.repository)
+    )
       return false;
 
     if (a.level === "directory") {
-      const dir = relativePath(a.directory!);
-      const inside = (p: string) => !dir || p === dir || p.startsWith(dir + "/");
+      const dir = relativePath(a.directory);
+      const inside = (p: string) => dir.length === 0 || p === dir || p.startsWith(dir + "/");
 
       if (
         !(context.directory !== undefined && inside(relativePath(context.directory))) &&
@@ -142,14 +146,12 @@ export function applicable(memory: Memory, context: Context): boolean {
         return false;
     }
 
-    if (a.level === "paths" && !matches(a.globs!)) return false;
+    if (a.level === "paths" && !matches(a.globs)) return false;
   }
 
-  const activation = memory.activation as Activation | undefined;
+  if (parsed.activation?.mode === "on_request" && context.explicit_request !== true) return false;
 
-  if (activation?.mode === "on_request" && !context.explicit_request) return false;
-
-  if (activation?.mode === "paths" && !matches(activation.globs!)) return false;
+  if (parsed.activation?.mode === "paths" && !matches(parsed.activation.globs)) return false;
 
   return true;
 }
@@ -158,21 +160,30 @@ export function applicable(memory: Memory, context: Context): boolean {
 export const memoryVersion = (memory: Memory) =>
   createHash("sha256").update(stable(memory)).digest("hex");
 
-export function selectMemory(state: State, data: Record<string, unknown>): Memory {
-  const identifier = text(data.identifier, "identifier");
+export interface MemorySelection {
+  identifier: string;
+  origin?: string;
+}
+
+export function selectMemory(state: State, data: MemorySelection): Memory {
   const found = state.memories.filter(
-    (m) => m.identifier === identifier && (!data.origin || m.x_omp_origin === data.origin),
+    (m) =>
+      m.identifier === data.identifier &&
+      (data.origin === undefined || m.x_omp_origin === data.origin),
   );
 
-  if (found.length === 0) throw new ApiError(404, "Memory not found");
+  const first = found.at(0);
+
+  if (first === undefined) throw new ApiError(404, "Memory not found");
 
   if (found.length > 1) throw new ApiError(409, "Ambiguous identifier; provide origin");
 
-  return found[0];
+  return first;
 }
 
 export function addContribution(memory: Memory, contributor: string, contribution: string): Memory {
-  const previous = Array.isArray(memory.provenance) ? memory.provenance : [];
+  const parsed = z.array(jsonValue).safeParse(memory.provenance);
+  const previous = parsed.success ? parsed.data : [];
 
   if (previous.length >= 100) throw new ApiError(413, "Prototype limit: 100 provenance entries");
 

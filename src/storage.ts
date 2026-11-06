@@ -1,7 +1,7 @@
-import git from "isomorphic-git";
+import { clone, init, resolveRef, add, commit as gitCommit, push } from "isomorphic-git";
 import http from "isomorphic-git/http/web";
 import { createFsFromVolume, Volume } from "memfs";
-import { ApiError, stable, type State } from "./model.ts";
+import { ApiError, stable, stateSchema, text, type State } from "./model.ts";
 
 export const STORES = ["personal", "company"] as const;
 
@@ -19,12 +19,12 @@ export async function read(
   const history = await repo.log({ ref: "main", limit: 1 });
   const commit = history[0]?.hash ?? null;
 
-  if (!commit) return { state: empty(store), commit: null };
+  if (commit === null) return { state: empty(store), commit: null };
   const blob = await repo.readFile({ ref: commit, path: FILE });
 
-  if (!blob) throw new Error("Artifact state file missing");
+  if (blob === null) throw new Error("Artifact state file missing");
 
-  return { state: JSON.parse(await blob.text()) as State, commit };
+  return { state: stateSchema.parse(JSON.parse(await blob.text())), commit };
 }
 
 /** Git's non-fast-forward rejection is the concurrency guard. Never force push. */
@@ -37,16 +37,20 @@ export async function mutate<T>(
   using repo = await artifacts.get(store);
   const info = await repo.info();
   const token = await repo.createToken("write", 300);
-  const onAuth = () => ({ username: "x", password: token.plaintext.split("?expires=")[0] });
+
+  const onAuth = () => ({
+    username: "x",
+    password: text(token.plaintext.split("?expires=").at(0), "Artifact write token", 8192),
+  });
 
   try {
-    for (let attempt = 0; attempt < 4; attempt++) {
+    async function attemptWrite(attempt: number): Promise<{ result: T; commit: string }> {
       const fs = createFsFromVolume(new Volume());
       const dir = "/memory";
       const history = await repo.log({ ref: "main", limit: 1 });
 
       if (history.length > 0)
-        await git.clone({
+        await clone({
           fs,
           http,
           dir,
@@ -56,16 +60,20 @@ export async function mutate<T>(
           depth: 1,
           onAuth,
         });
-      else await git.init({ fs, dir, defaultBranch: "main" });
+      else await init({ fs, dir, defaultBranch: "main" });
+
       const state =
         history.length > 0
-          ? (JSON.parse(String(await fs.promises.readFile(`${dir}/${FILE}`, "utf8"))) as State)
+          ? stateSchema.parse(
+              JSON.parse(String(await fs.promises.readFile(`${dir}/${FILE}`, "utf8"))),
+            )
           : empty(store);
+
       const before = stable(state);
       const result = apply(state);
 
       if (before === stable(state) && history.length > 0)
-        return { result, commit: await git.resolveRef({ fs, dir, ref: "HEAD" }) };
+        return { result, commit: await resolveRef({ fs, dir, ref: "HEAD" }) };
       await fs.promises.writeFile(`${dir}/${FILE}`, JSON.stringify(state, null, 2) + "\n");
       await fs.promises.writeFile(
         `${dir}/MEMORY.md`,
@@ -73,9 +81,10 @@ export async function mutate<T>(
           state.memories.map((m) => `- ${m.identifier}: ${m.title ?? "(untitled)"}`).join("\n") +
           "\n\nFull objects and extension fields are in omp-state.json.\n",
       );
-      await git.add({ fs, dir, filepath: FILE });
-      await git.add({ fs, dir, filepath: "MEMORY.md" });
-      const commit = await git.commit({
+      await add({ fs, dir, filepath: FILE });
+      await add({ fs, dir, filepath: "MEMORY.md" });
+
+      const commit = await gitCommit({
         fs,
         dir,
         message,
@@ -83,9 +92,13 @@ export async function mutate<T>(
       });
 
       try {
-        const pushed = await git.push({ fs, http, dir, url: info.remote, ref: "main", onAuth });
+        const pushed = await push({ fs, http, dir, url: info.remote, ref: "main", onAuth });
 
-        if (!pushed.ok || pushed.error || Object.values(pushed.refs).some((r) => !r.ok))
+        if (
+          !pushed.ok ||
+          pushed.error !== undefined ||
+          Object.values(pushed.refs).some((r) => !r.ok)
+        )
           throw new ApiError(409, "Artifact push was rejected");
 
         return { result, commit };
@@ -94,10 +107,12 @@ export async function mutate<T>(
         const latest = await repo.log({ ref: "main", limit: 1 });
 
         if (attempt === 3 || latest[0]?.hash === history[0]?.hash) throw error;
+
+        return attemptWrite(attempt + 1);
       }
     }
 
-    throw new ApiError(409, "Concurrent write; retry the request");
+    return await attemptWrite(0);
   } finally {
     await repo.revokeToken(token.plaintext);
   }

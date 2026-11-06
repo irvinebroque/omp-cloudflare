@@ -1,20 +1,21 @@
 {
   "compilerOptions": {
     "target": "es2024",
-    "lib": [
-      "es2024"
-    ],
+    "lib": ["es2024"],
     "module": "preserve",
     "moduleResolution": "bundler",
-    "types": [
-      "node"
-    ],
+    "types": ["node"],
     "strict": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true
   },
   "include": [
     "src",
@@ -22,6 +23,8 @@
     ".cloudflare/types",
     "sdk",
     "scripts",
-    "tests"
+    "tests",
+    "vite.config.ts",
+    "vitest.config.ts"
   ]
 }

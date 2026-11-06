@@ -1,6 +1,35 @@
+import { z } from "zod";
+import { type JsonInput, jsonValue } from "../src/model.ts";
 import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+
+const referenceSchema = z.object({
+  store: z.enum(["personal", "company"]),
+  identifier: z.string(),
+  origin: z.string(),
+});
+
+const projectSchema = z.object({
+  ref: referenceSchema,
+  version: z.string(),
+  memory: z.object({ body: z.string(), provenance: z.array(z.object({ id: z.string() })) }),
+});
+
+const searchSchema = z.object({
+  memories: z.array(
+    z.object({
+      ref: referenceSchema,
+      title: z.string().optional(),
+      snippet: z.string(),
+      memory: z.never().optional(),
+    }),
+  ),
+  total: z.number(),
+});
+
+const aboutSchema = z.object({ storage: z.string() });
+const statusSchema = z.object({ status: z.number() });
 
 const base = (process.argv[2] ?? "https://ompi-memory.roundtrip.workers.dev").replace(/\/$/, "");
 const client = new Client({ name: "omp-roundtrip", version: "0.1.0" });
@@ -9,24 +38,29 @@ const repository = "https://github.com/omp-example/" + prefix;
 const context = { repository, directory: ".", paths: ["src/example.ts"] };
 const created: { store: string; identifier: string; origin: string }[] = [];
 const checks: string[] = [];
+
 const ok = (name: string) => {
   checks.push(name);
   console.error("PASS " + name);
 };
 
-async function raw(name: string, args: Record<string, unknown>) {
+async function raw(name: string, args: Record<string, JsonInput>) {
   return client.callTool({ name, arguments: args });
 }
 
-async function call(name: string, args: Record<string, unknown>) {
+async function call<S extends z.ZodType>(
+  schema: S,
+  name: string,
+  args: Record<string, JsonInput>,
+): Promise<z.output<S>> {
   const response = await raw(name, args);
-  assert.ok(!response.isError, JSON.stringify(response));
+  assert.ok(response.isError !== true, JSON.stringify(response));
 
-  return response.structuredContent as Record<string, any>;
+  return schema.parse(response.structuredContent);
 }
 
-async function add(store: string, suffix: string, extra: Record<string, unknown> = {}) {
-  const result = await call("add_memory", {
+async function add(store: string, suffix: string, extra: Record<string, JsonInput> = {}) {
+  const result = await call(projectSchema, "add_memory", {
     store,
     identifier: prefix + "-" + suffix,
     body: prefix + " " + suffix,
@@ -35,6 +69,7 @@ async function add(store: string, suffix: string, extra: Record<string, unknown>
     contributor: "agent:omp-test",
     ...extra,
   });
+
   created.push(result.ref);
 
   return result;
@@ -43,7 +78,7 @@ async function add(store: string, suffix: string, extra: Record<string, unknown>
 try {
   await client.connect(new StreamableHTTPClientTransport(new URL(base + "/mcp")));
   const tools = await client.listTools();
-  assert.deepEqual(tools.tools.map((t) => t.name).sort(), [
+  assert.deepEqual(tools.tools.map((t) => t.name).toSorted(), [
     "about_omp",
     "add_memory",
     "delete_memory",
@@ -52,61 +87,65 @@ try {
     "update_memory",
   ]);
   ok("MCP initialize and six-tool discovery");
-  const about = await call("about_omp", {});
+  const about = await call(aboutSchema, "about_omp", {});
   assert.equal(about.storage, "Cloudflare Artifacts Git repositories");
   const resource = await client.readResource({ uri: "omp://about" });
   assert.ok(resource.contents.length);
   ok("Capability discovery and resource read");
   const personal = await add("personal", "personal");
   const company = await add("company", "company");
-  let search = await call("search_memories", { query: prefix, context });
+  let search = await call(searchSchema, "search_memories", { query: prefix, context });
   assert.equal(search.memories.length, 2);
   assert.deepEqual(
-    new Set(search.memories.map((m: any) => m.ref.store)),
+    new Set(search.memories.map((m) => m.ref.store)),
     new Set(["personal", "company"]),
   );
-  assert.ok(search.memories.every((m: any) => !m.memory && m.snippet));
-  const fetched = await call("get_memory", { ...personal.ref, context });
+  assert.ok(search.memories.every((m) => m.memory === undefined && m.snippet.length > 0));
+  const fetched = await call(projectSchema, "get_memory", { ...personal.ref, context });
   assert.equal(fetched.memory.body, prefix + " personal");
-  assert.equal(fetched.memory.provenance[0].id, "agent:omp-test");
+  assert.equal(fetched.memory.provenance.at(0)?.id, "agent:omp-test");
   ok("Writes route to separate stores; search returns summaries and get returns provenance");
   await add("personal", "repo", { applies_to: { level: "repository", repository } });
   const wrong = { repository: "https://github.com/omp-example/other", directory: "." };
-  search = await call("search_memories", { query: prefix, context: wrong });
-  assert.ok(!search.memories.some((m: any) => m.title === "repo"));
-  search = await call("search_memories", { query: prefix, context });
-  assert.ok(search.memories.some((m: any) => m.title === "repo"));
-  const repoRef = created.at(-1)!;
+  search = await call(searchSchema, "search_memories", { query: prefix, context: wrong });
+  assert.ok(!search.memories.some((m) => m.title === "repo"));
+  search = await call(searchSchema, "search_memories", { query: prefix, context });
+  assert.ok(search.memories.some((m) => m.title === "repo"));
+  const repoRef = created.at(-1);
+  assert.ok(repoRef);
   assert.equal((await raw("get_memory", { ...repoRef, context: wrong })).isError, true);
   ok("Repository rules do not leak through search or direct reads");
   await add("company", "paths", {
     applies_to: { level: "repository", repository },
     activation: { mode: "paths", globs: ["src/**/*.ts"] },
   });
-  search = await call("search_memories", {
+  search = await call(searchSchema, "search_memories", {
     query: prefix,
     context: { repository, directory: ".", paths: ["docs/readme.md"] },
   });
-  assert.ok(!search.memories.some((m: any) => m.title === "paths"));
-  search = await call("search_memories", { query: prefix, context });
-  assert.ok(search.memories.some((m: any) => m.title === "paths"));
+  assert.ok(!search.memories.some((m) => m.title === "paths"));
+  search = await call(searchSchema, "search_memories", { query: prefix, context });
+  assert.ok(search.memories.some((m) => m.title === "paths"));
   await add("personal", "manual", { activation: { mode: "on_request" } });
-  search = await call("search_memories", { query: prefix, context });
-  assert.ok(!search.memories.some((m: any) => m.title === "manual"));
-  search = await call("search_memories", {
+  search = await call(searchSchema, "search_memories", { query: prefix, context });
+  assert.ok(!search.memories.some((m) => m.title === "manual"));
+  search = await call(searchSchema, "search_memories", {
     query: prefix,
     context: { ...context, explicit_request: true },
   });
-  assert.ok(search.memories.some((m: any) => m.title === "manual"));
+  assert.ok(search.memories.some((m) => m.title === "manual"));
   ok("Path and on-request activation filter correctly");
-  const updated = await call("update_memory", {
+
+  const updated = await call(projectSchema, "update_memory", {
     ...personal.ref,
     context,
     if_version: personal.version,
     patch: { body: prefix + " revised" },
     contributor: "agent:omp-test",
   });
+
   assert.notEqual(updated.version, personal.version);
+
   const stale = await raw("update_memory", {
     ...personal.ref,
     context,
@@ -114,27 +153,30 @@ try {
     patch: { body: "stale" },
     contributor: "agent:other",
   });
+
   assert.equal(stale.isError, true);
-  assert.equal((stale.structuredContent as any).status, 409);
+  assert.equal(statusSchema.parse(stale.structuredContent).status, 409);
+
   const staleDelete = await raw("delete_memory", {
     ...personal.ref,
     context,
     if_version: personal.version,
   });
+
   assert.equal(staleDelete.isError, true);
   assert.equal(
-    (await call("get_memory", { ...personal.ref, context })).memory.body,
+    (await call(projectSchema, "get_memory", { ...personal.ref, context })).memory.body,
     prefix + " revised",
   );
   // Updating a different memory must not invalidate this one's token.
-  await call("update_memory", {
+  await call(projectSchema, "update_memory", {
     ...company.ref,
     context,
     if_version: company.version,
     patch: { title: "changed elsewhere" },
     contributor: "agent:omp-test",
   });
-  await call("update_memory", {
+  await call(projectSchema, "update_memory", {
     ...personal.ref,
     context,
     if_version: updated.version,
@@ -142,18 +184,21 @@ try {
     contributor: "agent:omp-test",
   });
   ok("Stale edits/deletes fail; unrelated writes do not invalidate per-memory versions");
+
   const invalid = await raw("add_memory", {
     store: "company",
     body: "bad",
     applies_to: { level: "repository" },
     contributor: "agent:test",
   });
+
   assert.equal(invalid.isError, true);
   const unknown = await raw("search_memories", { query: prefix, context, typo: true });
   assert.equal(unknown.isError, true);
   ok("Invalid applicability and unknown tool arguments are rejected");
   // One writer wins when two revisions start from the same version.
-  const head = await call("get_memory", { ...company.ref, context });
+  const head = await call(projectSchema, "get_memory", { ...company.ref, context });
+
   const simultaneous = await Promise.all(
     ["first", "second"].map((body) =>
       raw("update_memory", {
@@ -165,21 +210,25 @@ try {
       }),
     ),
   );
-  assert.equal(simultaneous.filter((r) => !r.isError).length, 1);
-  assert.equal(simultaneous.filter((r) => r.isError).length, 1);
+
+  assert.equal(simultaneous.filter((r) => r.isError !== true).length, 1);
+  assert.equal(simultaneous.filter((r) => r.isError === true).length, 1);
   ok("Concurrent edits from the same version produce one winner and one conflict");
 } finally {
-  for (const ref of created) {
-    const memory = await call("get_memory", {
+  await created.reduce(async (previous, ref) => {
+    await previous;
+
+    const memory = await call(projectSchema, "get_memory", {
       ...ref,
       context: { ...context, explicit_request: true },
     });
-    await call("delete_memory", {
+
+    await call(jsonValue, "delete_memory", {
       ...ref,
       context: { ...context, explicit_request: true },
       if_version: memory.version,
     });
-  }
+  }, Promise.resolve());
 
   await client.close();
 }
@@ -194,4 +243,5 @@ const report = {
 
 console.log(JSON.stringify(report, null, 2));
 
-if (process.argv[3]) await writeFile(process.argv[3], JSON.stringify(report, null, 2) + "\n");
+if (process.argv[3] !== undefined)
+  await writeFile(process.argv[3], JSON.stringify(report, null, 2) + "\n");

@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { merge, validateMemory, archive, type State } from "../src/model.ts";
 
@@ -10,16 +10,18 @@ const memory = () =>
     body: "Use TypeScript",
     custom: { owner: "team", nested: [1, 2] },
   });
+
 const state = (origin = "store:a"): State => ({ origin, memories: [], tombstones: [] });
 
 test("unknown fields and origin survive export/import, repeated imports do not duplicate", () => {
   const a = state(),
     b = state("store:b");
+
   merge(a, [memory()]);
   const exported = archive(a);
-  assert.equal(merge(b, exported.memories)[0].status, "accepted");
+  assert.equal(merge(b, exported.memories).at(0)?.status, "accepted");
   assert.deepEqual(b.memories, a.memories);
-  assert.equal(merge(b, exported.memories)[0].status, "unchanged");
+  assert.equal(merge(b, exported.memories).at(0)?.status, "unchanged");
   assert.equal(b.memories.length, 1);
 });
 
@@ -36,20 +38,21 @@ test("conflicting content does not silently overwrite existing identity", () => 
   const s = state();
   merge(s, [memory()]);
   const receipts = merge(s, [{ ...memory(), body: "Other" }]);
-  assert.equal(receipts[0].status, "rejected");
-  assert.equal(s.memories[0].body, "Use TypeScript");
+  assert.equal(receipts.at(0)?.status, "rejected");
+  assert.equal(s.memories.at(0)?.body, "Use TypeScript");
 });
 
 test("tombstone propagates deletion and blocks old snapshot replay", () => {
   const a = state(),
     b = state("b");
+
   merge(a, [memory()]);
   const stale = archive(a);
   merge(b, stale.memories);
   const t = { origin: a.origin, identifier: "a", deleted_at: "2026-11-06T13:00:00Z" };
   merge(a, [], [t]);
   merge(b, [], archive(a).tombstones);
-  assert.equal(merge(b, stale.memories)[0].reason, "deleted_identity");
+  assert.equal(merge(b, stale.memories).at(0)?.reason, "deleted_identity");
   assert.equal(b.memories.length, 0);
 });
 

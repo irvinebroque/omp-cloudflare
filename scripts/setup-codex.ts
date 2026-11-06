@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { spawnSync } from "node:child_process";
 import { lstat, mkdir, readlink, realpath, symlink, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -19,7 +20,11 @@ if (
 )
   throw new Error("Use HTTPS, or HTTP localhost for development");
 
-if (endpoint.username || endpoint.password || endpoint.search || endpoint.hash)
+if (
+  [endpoint.username, endpoint.password, endpoint.search, endpoint.hash].some(
+    (value) => value.length > 0,
+  )
+)
   throw new Error("Do not put credentials, query parameters, or fragments in the endpoint URL");
 
 const source = await realpath(resolve(import.meta.dirname, "../codex/skills/omp-memory"));
@@ -34,14 +39,20 @@ function cli(...command: string[]) {
 }
 
 const existingResult = cli("mcp", "get", name, "--json");
-const existing = existingResult.status === 0 ? JSON.parse(existingResult.stdout) : undefined;
 
-if (existing && existing.transport?.url !== endpoint.href)
+const existing =
+  existingResult.status === 0
+    ? z
+        .object({ enabled: z.boolean(), transport: z.object({ url: z.string().optional() }) })
+        .parse(JSON.parse(existingResult.stdout))
+    : undefined;
+
+if (existing !== undefined && existing.transport?.url !== endpoint.href)
   throw new Error(
     `The ${name} server already exists with another endpoint. Resolve it with codex mcp get/remove before changing it.`,
   );
 
-if (existing && existing.enabled === false && !uninstall)
+if (existing !== undefined && !existing.enabled && !uninstall)
   throw new Error(
     "The omp-memory server is disabled in Codex config. Enable it before running setup.",
   );
@@ -57,11 +68,11 @@ try {
     );
   installed = true;
 } catch (error) {
-  if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  if (!z.object({ code: z.literal("ENOENT") }).safeParse(error).success) throw error;
 }
 
 if (uninstall) {
-  if (existing) {
+  if (existing !== undefined) {
     const removed = cli("mcp", "remove", name);
 
     if (removed.status !== 0) throw new Error(removed.stderr || "Could not remove MCP server");
@@ -77,10 +88,15 @@ if (uninstall) {
     signal: AbortSignal.timeout(15000),
   });
 
-  if (!response.ok || (await response.json()).experimental_binding !== "omp-cloudflare-mcp/0.1")
+  if (
+    !response.ok ||
+    !z
+      .object({ experimental_binding: z.literal("omp-cloudflare-mcp/0.1") })
+      .safeParse(await response.json()).success
+  )
     throw new Error("Endpoint is not the expected OMP MCP deployment");
 
-  if (!existing) {
+  if (existing === undefined) {
     const added = cli("mcp", "add", name, "--url", endpoint.href);
 
     if (added.status !== 0) throw new Error(added.stderr || "Could not register MCP server");

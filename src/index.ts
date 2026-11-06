@@ -5,11 +5,14 @@ import {
   merge,
   object,
   text,
-  timestamp,
+  archiveSchema,
+  objectSchema,
+  jsonValue,
+  type JsonInput,
+  type Json,
   validateMemory,
-  type Tombstone,
 } from "./model.ts";
-import { mutate, read, STORES, type Store } from "./storage.ts";
+import { mutate, read, STORES } from "./storage.ts";
 import { page } from "./page.ts";
 import { federatedSearch, targetStore, searchInput, searchMemories } from "./gateway.ts";
 import {
@@ -22,42 +25,31 @@ import {
 } from "./runtime.ts";
 import { handleMcp } from "./mcp.ts";
 
-const json = (value: unknown, status = 200) =>
+const json = (value: JsonInput, status = 200) =>
   Response.json(value, { status, headers: { "cache-control": "no-store" } });
 
-async function body(request: Request): Promise<Record<string, unknown>> {
-  if (!request.headers.get("content-type")?.includes("application/json"))
+async function body(request: Request): Promise<Record<string, Json>> {
+  if (request.headers.get("content-type")?.includes("application/json") !== true)
     throw new ApiError(415, "Use application/json");
 
-  if (!request.body) throw new ApiError(400, "JSON body required");
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
+  if (request.body === null) throw new ApiError(400, "JSON body required");
   let size = 0;
 
-  while (true) {
-    const chunk = await reader.read();
+  const limited = request.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        size += chunk.byteLength;
 
-    if (chunk.done) break;
-    size += chunk.value.byteLength;
+        if (size > 1048576) throw new ApiError(413, "Request limit: 1 MiB");
+        controller.enqueue(chunk);
+      },
+    }),
+  );
 
-    if (size > 1048576) {
-      await reader.cancel();
-      throw new ApiError(413, "Request limit: 1 MiB");
-    }
-
-    chunks.push(chunk.value);
-  }
-
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
+  const bytes = await new Response(limited).arrayBuffer();
 
   try {
-    return object(JSON.parse(new TextDecoder().decode(bytes)));
+    return objectSchema.parse(JSON.parse(new TextDecoder().decode(bytes)));
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(400, "Invalid JSON");
@@ -138,8 +130,9 @@ async function route(request: Request, env: Env): Promise<Response> {
     const operation = url.pathname.slice("/gateway/fmp/".length);
 
     if (!supported.includes(operation)) throw new ApiError(404, "Gateway endpoint not supported");
-    const { store: ignored, ...payload } = data;
+    const payload = Object.fromEntries(Object.entries(data).filter(([name]) => name !== "store"));
     const internalUrl = new URL(`/stores/${target}/fmp/${operation}`, url);
+
     const response = await route(
       new Request(internalUrl, {
         method: "POST",
@@ -149,19 +142,23 @@ async function route(request: Request, env: Env): Promise<Response> {
       env,
     );
 
-    return json({ routed_to: target, ...(await response.json()) }, response.status);
+    return json(
+      { routed_to: target, ...objectSchema.parse(await response.json()) },
+      response.status,
+    );
   }
 
   const match = url.pathname.match(/^\/stores\/(personal|company)\/(fmp\/.*|history)$/);
 
-  if (!match) throw new ApiError(404, "Route not found; see /fmp/info");
-  const store = match[1] as Store,
+  if (match === null) throw new ApiError(404, "Route not found; see /fmp/info");
+
+  const store = targetStore(match[1]),
     path = match[2];
 
   if (request.method === "GET" && path === "history") {
     using repo = await env.ARTIFACTS.get(store);
 
-    return json({ commits: await repo.log({ ref: "main", limit: 20 }) });
+    return json({ commits: jsonValue.parse(await repo.log({ ref: "main", limit: 20 })) });
   }
 
   if (request.method === "GET" && path === "fmp/info")
@@ -193,7 +190,11 @@ async function route(request: Request, env: Env): Promise<Response> {
 
   if (path === "fmp/read") {
     const { state, commit } = await read(env.ARTIFACTS, store);
-    const memory = selectMemory(state, data);
+
+    const memory = selectMemory(state, {
+      identifier: text(data.identifier, "identifier"),
+      origin: data.origin === undefined ? undefined : text(data.origin, "origin"),
+    });
 
     if (data.context !== undefined && !applicable(memory, validateContext(data.context)))
       throw new ApiError(404, "Memory is not applicable in this context");
@@ -205,8 +206,9 @@ async function route(request: Request, env: Env): Promise<Response> {
     const { query, limit } = searchInput(data);
     const { state, commit } = await read(env.ARTIFACTS, store);
     const context = data.context === undefined ? undefined : validateContext(data.context);
+
     const memories = searchMemories(state.memories, query).filter(
-      (m) => !context || applicable(m, context),
+      (m) => context === undefined || applicable(m, context),
     );
 
     return json({ memories: memories.slice(0, limit), total: memories.length, commit });
@@ -219,13 +221,15 @@ async function route(request: Request, env: Env): Promise<Response> {
       created_at: new Date().toISOString(),
       ...object(data.memory),
     });
+
     validateConventions(memory);
 
     if (data.contributor !== undefined)
       memory = addContribution(memory, text(data.contributor, "contributor"), "authored");
 
-    if (memory.x_omp_origin)
+    if (memory.x_omp_origin !== undefined)
       throw new ApiError(400, "Use import to ingest memories from another origin");
+
     const saved = await mutate(env.ARTIFACTS, store, `Remember ${memory.identifier}`, (state) => ({
       receipts: merge(state, [memory]),
       memory: { ...memory, x_omp_origin: state.origin },
@@ -233,13 +237,16 @@ async function route(request: Request, env: Env): Promise<Response> {
 
     return json(
       { ...saved.result, version: memoryVersion(saved.result.memory), commit: saved.commit },
-      saved.result.receipts[0].status === "rejected" ? 409 : 200,
+      saved.result.receipts.at(0)?.status === "rejected" ? 409 : 200,
     );
   }
 
   if (path === "fmp/update") {
     const result = await mutate(env.ARTIFACTS, store, `Update memory`, (state) => {
-      const old = selectMemory(state, data);
+      const old = selectMemory(state, {
+        identifier: text(data.identifier, "identifier"),
+        origin: data.origin === undefined ? undefined : text(data.origin, "origin"),
+      });
 
       if (data.context !== undefined && !applicable(old, validateContext(data.context)))
         throw new ApiError(404, "Memory is not applicable in this context");
@@ -275,30 +282,39 @@ async function route(request: Request, env: Env): Promise<Response> {
   if (path === "fmp/delete") {
     const result = await mutate(env.ARTIFACTS, store, "Delete memory", (state) => {
       const identifier = text(data.identifier, "identifier");
+
       const existing = state.memories.find(
-        (m) => m.identifier === identifier && (!data.origin || m.x_omp_origin === data.origin),
+        (m) =>
+          m.identifier === identifier &&
+          (data.origin === undefined || m.x_omp_origin === data.origin),
       );
 
-      if (!existing) {
+      if (existing === undefined) {
         const deleted = state.tombstones.find(
-          (t) => t.identifier === identifier && (!data.origin || t.origin === data.origin),
+          (t) =>
+            t.identifier === identifier && (data.origin === undefined || t.origin === data.origin),
         );
 
-        if (deleted) return { deleted: true, tombstone: deleted };
+        if (deleted !== undefined) return { deleted: true, tombstone: deleted };
       }
 
-      const m = selectMemory(state, data);
+      const m = selectMemory(state, {
+        identifier: text(data.identifier, "identifier"),
+        origin: data.origin === undefined ? undefined : text(data.origin, "origin"),
+      });
 
       if (data.context !== undefined && !applicable(m, validateContext(data.context)))
         throw new ApiError(404, "Memory is not applicable in this context");
 
       if (data.if_version !== undefined && text(data.if_version, "if_version") !== memoryVersion(m))
         throw new ApiError(409, "Memory changed; read it again before deleting");
+
       const tombstone = {
         origin: m.x_omp_origin ?? state.origin,
         identifier: m.identifier,
         deleted_at: new Date().toISOString(),
       };
+
       merge(state, [], [tombstone]);
 
       return { deleted: true, tombstone };
@@ -308,46 +324,17 @@ async function route(request: Request, env: Env): Promise<Response> {
   }
 
   if (path === "fmp/import") {
-    const manifest = object(data.manifest);
+    const parsed = archiveSchema.safeParse(data);
 
-    if (
-      manifest.protocol_version !== "0.2" ||
-      manifest.intent !== "copy" ||
-      manifest.selection !== "snapshot"
-    )
-      throw new ApiError(400, "Only OMP 0.2 snapshot/copy imports are supported");
+    if (!parsed.success) throw new ApiError(400, "Invalid OMP 0.2 minimal snapshot/copy archive");
+    const { manifest, tombstones } = parsed.data;
 
-    if (
-      !Array.isArray(manifest.profiles) ||
-      manifest.profiles.length !== 1 ||
-      manifest.profiles[0] !== "minimal"
-    )
-      throw new ApiError(400, "Only the minimal profile is supported");
-    const source = text(manifest.origin, "manifest.origin");
-    timestamp(manifest.exported_at, "manifest.exported_at");
+    const memories = parsed.data.memories.map((memory) => {
+      memory.x_omp_origin ??= manifest.origin;
 
-    if (!Array.isArray(data.memories) || data.memories.length > 100)
-      throw new ApiError(400, "memories must be an array of at most 100 objects");
-    const memories = data.memories.map((m) => {
-      const v = validateMemory(m);
-
-      return { ...v, x_omp_origin: v.x_omp_origin ?? source };
+      return memory;
     });
 
-    if (
-      data.tombstones !== undefined &&
-      (!Array.isArray(data.tombstones) || data.tombstones.length > 500)
-    )
-      throw new ApiError(400, "Invalid tombstones");
-    const tombstones: Tombstone[] = ((data.tombstones as unknown[]) ?? []).map((t) => {
-      const v = object(t);
-
-      return {
-        origin: text(v.origin, "origin"),
-        identifier: text(v.identifier, "identifier"),
-        deleted_at: timestamp(v.deleted_at, "deleted_at"),
-      };
-    });
     const result = await mutate(env.ARTIFACTS, store, "Import OMP snapshot", (state) => ({
       receipts: merge(state, memories, tombstones),
     }));

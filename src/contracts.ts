@@ -1,0 +1,93 @@
+import { z } from "zod";
+import {
+  archiveSchema,
+  memorySchema,
+  receiptSchema,
+  tombstoneSchema,
+  objectSchema,
+  ApiError,
+  type JsonInput,
+} from "./model.ts";
+
+export const storeSchema = z.enum(["personal", "company"]);
+
+export const readResponse = z.object({
+  memory: memorySchema,
+  version: z.string(),
+  commit: z.string(),
+});
+
+export const savedResponse = readResponse.extend({ receipts: z.array(receiptSchema) });
+export const importedResponse = z.object({ receipts: z.array(receiptSchema), commit: z.string() });
+
+export const deletedResponse = z.object({
+  deleted: z.literal(true),
+  tombstone: tombstoneSchema,
+  commit: z.string(),
+});
+
+export const searchResponse = z.object({
+  memories: z.array(memorySchema),
+  total: z.number(),
+  commit: z.string().nullable(),
+});
+
+export const gatewaySearchResponse = z.object({
+  memories: z.array(
+    z.object({ store: storeSchema, memory: memorySchema, commit: z.string().nullable() }),
+  ),
+  total: z.number(),
+  partial: z.boolean(),
+  stores: z.array(z.object({ store: storeSchema, ok: z.boolean() })),
+});
+
+export const exportResponse = archiveSchema.extend({
+  storage: z.object({ provider: z.string(), repo: z.string(), commit: z.string().nullable() }),
+});
+
+export const historyResponse = z.object({
+  commits: z.array(
+    z.object({ hash: z.string(), message: z.string(), parents: z.array(z.string()) }),
+  ),
+});
+
+export const storeInfoResponse = z.object({
+  store: storeSchema,
+  capabilities: z.array(z.string()),
+  auth: z.string(),
+});
+
+export const gatewayInfoResponse = z.object({
+  connected_stores: z.array(storeSchema),
+  routing: z.object({ default: storeSchema }),
+});
+
+const errorResponse = z.object({ error: z.string() });
+
+/** Validate every JSON response before exposing it to MCP or SDK callers. */
+export async function decodeResponse<S extends z.ZodType>(
+  response: Response,
+  schema: S,
+): Promise<z.output<S>> {
+  const payload: JsonInput = objectSchema.parse(await response.json());
+
+  if (!response.ok) {
+    const failure = errorResponse.safeParse(payload);
+    throw new ApiError(
+      response.status,
+      failure.success ? failure.data.error : "Memory operation failed",
+    );
+  }
+
+  return schema.parse(payload);
+}
+
+export function requestOptions(data?: JsonInput): RequestInit {
+  return data === undefined
+    ? {}
+    : {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(data),
+      };
+}

@@ -1,83 +1,74 @@
-import type { Archive, Memory, Receipt } from "../src/model.ts";
+import type { z } from "zod";
+import { memoryFieldsSchema, type Archive, type JsonInput, type Memory } from "../src/model.ts";
+import {
+  decodeResponse,
+  requestOptions,
+  readResponse,
+  savedResponse,
+  importedResponse,
+  deletedResponse,
+  searchResponse,
+  gatewaySearchResponse,
+  exportResponse,
+  historyResponse,
+  storeInfoResponse,
+  gatewayInfoResponse,
+  storeSchema,
+} from "../src/contracts.ts";
 
 export type { Archive, Memory, Receipt } from "../src/model.ts";
 
-export type Store = "personal" | "company";
+export type Store = z.infer<typeof storeSchema>;
 
-export type MemoryInput = Pick<Memory, "body"> & Partial<Omit<Memory, "body">>;
+const memoryInput = memoryFieldsSchema.partial().required({ body: true });
 
-export interface SavedMemory {
-  memory: Memory;
-  receipts: Receipt[];
-  commit: string;
-}
+export type MemoryInput = z.input<typeof memoryInput>;
+
+export type SavedMemory = z.infer<typeof savedResponse>;
 
 export class OmpClient {
   baseUrl: string;
   store: Store;
   constructor(baseUrl: string, store: Store = "personal") {
-    this.baseUrl = baseUrl.replace(/\/$/, "");
+    this.baseUrl = baseUrl.replace(/\/$/u, "");
     this.store = store;
   }
-  private async request<T>(path: string, data?: unknown): Promise<T> {
-    const response = await fetch(
-      `${this.baseUrl}/stores/${this.store}/${path}`,
-      data === undefined
-        ? {}
-        : {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(data),
-          },
+  private async request<S extends z.ZodType>(
+    path: string,
+    schema: S,
+    data?: JsonInput,
+  ): Promise<z.output<S>> {
+    return decodeResponse(
+      await fetch(this.baseUrl + "/stores/" + this.store + "/" + path, requestOptions(data)),
+      schema,
     );
-    const result = (await response.json()) as T & { error?: string };
-
-    if (!response.ok)
-      throw new Error(`OMP ${response.status}: ${result.error ?? "Request failed"}`);
-
-    return result;
   }
   info() {
-    return this.request<{ store: Store; capabilities: string[]; auth: string }>("fmp/info");
+    return this.request("fmp/info", storeInfoResponse);
   }
   remember(memory: MemoryInput) {
-    return this.request<SavedMemory>("fmp/upload/inferences", { memory });
+    return this.request("fmp/upload/inferences", savedResponse, { memory });
   }
   read(identifier: string, origin?: string) {
-    return this.request<{ memory: Memory; version: string; commit: string }>("fmp/read", {
-      identifier,
-      origin,
-    });
+    return this.request("fmp/read", readResponse, { identifier, origin });
   }
   search(query: string, limit = 20) {
-    return this.request<{ memories: Memory[]; total: number; commit: string | null }>(
-      "fmp/search",
-      { query, limit },
-    );
+    return this.request("fmp/search", searchResponse, { query, limit });
   }
   update(identifier: string, patch: Partial<Memory>, origin?: string, if_version?: string) {
-    return this.request<{ memory: Memory; version: string; commit: string }>("fmp/update", {
-      identifier,
-      patch,
-      origin,
-      if_version,
-    });
+    return this.request("fmp/update", readResponse, { identifier, patch, origin, if_version });
   }
   delete(identifier: string, origin?: string) {
-    return this.request<{ deleted: true; commit: string }>("fmp/delete", { identifier, origin });
+    return this.request("fmp/delete", deletedResponse, { identifier, origin });
   }
   export() {
-    return this.request<
-      Archive & { storage: { provider: string; repo: string; commit: string | null } }
-    >("fmp/read_inferences");
+    return this.request("fmp/read_inferences", exportResponse);
   }
   import(snapshot: Archive) {
-    return this.request<{ receipts: Receipt[]; commit: string }>("fmp/import", snapshot);
+    return this.request("fmp/import", importedResponse, snapshot);
   }
   history() {
-    return this.request<{ commits: { hash: string; message: string; parents: string[] }[] }>(
-      "history",
-    );
+    return this.request("history", historyResponse);
   }
 }
 
@@ -85,40 +76,28 @@ export class OmpClient {
 export class OmpGateway {
   baseUrl: string;
   constructor(baseUrl: string) {
-    this.baseUrl = baseUrl.replace(/\/$/, "");
+    this.baseUrl = baseUrl.replace(/\/$/u, "");
   }
-  private async request<T>(path: string, data?: unknown): Promise<T> {
-    const r = await fetch(
-      `${this.baseUrl}/gateway/${path}`,
-      data === undefined
-        ? {}
-        : {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(data),
-          },
+  private async request<S extends z.ZodType>(
+    path: string,
+    schema: S,
+    data?: JsonInput,
+  ): Promise<z.output<S>> {
+    return decodeResponse(
+      await fetch(this.baseUrl + "/gateway/" + path, requestOptions(data)),
+      schema,
     );
-    const result = (await r.json()) as T & { error?: string };
-
-    if (!r.ok) throw new Error(`OMP ${r.status}: ${result.error ?? "Gateway request failed"}`);
-
-    return result;
   }
   info() {
-    return this.request<{ connected_stores: Store[]; routing: { default: Store } }>("info");
+    return this.request("info", gatewayInfoResponse);
   }
   remember(memory: MemoryInput, store: Store = "personal") {
-    return this.request<SavedMemory & { routed_to: Store }>("fmp/upload/inferences", {
+    return this.request("fmp/upload/inferences", savedResponse.extend({ routed_to: storeSchema }), {
       memory,
       store,
     });
   }
   search(query: string, limit = 20) {
-    return this.request<{
-      memories: { store: Store; memory: Memory; commit: string | null }[];
-      total: number;
-      partial: boolean;
-      stores: { store: Store; ok: boolean }[];
-    }>("fmp/search", { query, limit });
+    return this.request("fmp/search", gatewaySearchResponse, { query, limit });
   }
 }

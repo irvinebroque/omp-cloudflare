@@ -2,28 +2,21 @@
   "name": "cloudflare-memory",
   "private": true,
   "type": "module",
-  "engines": {
-    "node": "^24.22.0 || ^26.12.0"
-  },
   "scripts": {
     "dev": "cf dev",
     "build": "cf build",
     "deploy": "cf deploy",
     "typecheck": "cf workers types && tsc",
-    "test": "node --test tests/*.test.ts",
+    "test": "vp test run",
     "roundtrip": "node scripts/roundtrip.ts",
     "mcp:roundtrip": "node scripts/mcp-roundtrip.ts",
     "codex:setup": "node scripts/setup-codex.ts",
-    "codex:check": "node scripts/check-codex.ts"
-  },
-  "devDependencies": {
-    "@cloudflare/vite-plugin": "beta",
-    "@modelcontextprotocol/client": "2.4.0",
-    "@types/node": "^26.6.6",
-    "@types/picomatch": "^4.0.3",
-    "cf": "^1.0.0-beta.17",
-    "typescript": "^7.0.2",
-    "vite": "^8.3.0"
+    "codex:check": "node scripts/check-codex.ts",
+    "check": "cf workers types && vp check --deny-warnings",
+    "lint": "cf workers types && vp lint --deny-warnings",
+    "lint:fix": "vp lint --fix",
+    "format": "vp fmt",
+    "format:check": "vp fmt --check"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.4.0",
@@ -32,5 +25,22 @@
     "memfs": "^4.80.0",
     "picomatch": "^4.0.7",
     "zod": "^4.6.7"
-  }
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "beta",
+    "@modelcontextprotocol/client": "2.4.0",
+    "@types/node": "^26.6.6",
+    "@types/picomatch": "^4.0.3",
+    "cf": "^1.0.0-beta.17",
+    "typescript": "^7.0.2",
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.5.0",
+    "vite-plus": "1.5.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.5.0"
+  },
+  "engines": {
+    "node": "^24.22.0 || ^26.12.0"
+  },
+  "packageManager": "npm@11.19.1"
 }

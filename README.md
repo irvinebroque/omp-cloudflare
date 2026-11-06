@@ -36,7 +36,7 @@ Requirements: Node.js 24.22.x or a compatible later 24.x release, or Node.js 26.
 cd prototypes/cloudflare-memory
 npm ci
 cf auth whoami
-npm run typecheck
+npm run check
 npm test
 npm run deploy
 npm run roundtrip -- https://ompi-memory.roundtrip.workers.dev
@@ -52,6 +52,38 @@ cf deploy
 ```
 
 Repository creation outputs an initial Git token: keep it private. Runtime requests mint short-lived repo-scoped tokens through the binding and revoke them in `finally`; no token is sent to API clients or stored in source. `npm run dev` uses the CLI's local Artifacts simulation; deploy/roundtrip verifies the real service.
+
+## Code quality
+
+[Vite+](https://viteplus.dev/guide/) 1.5.0 supplies the build toolchain, formatter,
+type-aware Oxlint, and Vitest. `cf dev`, `cf build`, and `cf deploy` remain the
+Cloudflare entry points and delegate the Vite work to Vite+. No global Vite+
+installation is required after `npm ci`.
+
+```sh
+npm run check         # Generate binding types, check formatting, lint and types; deny warnings
+npm run lint          # Strict, type-aware lint and type checking
+npm run lint:fix      # Apply available lint fixes
+npm run format        # Format owned project files
+npm test              # Node unit tests through Vite+; no Cloudflare network calls
+npm run build         # Cloudflare production build through Vite+
+```
+
+`vite.config.ts` enables correctness, suspicious, and performance rules as errors,
+plus explicit rules against unsafe values/assertions, implicit truthiness, floating
+promises, and non-exhaustive switches. TypeScript uses `strict`, checked indexed
+access, unused-local/parameter checks, and override/fallthrough checks. All 18 generic
+[anti-slop](https://github.com/dmmulroy/anti-slop) rules and its native accumulating-spread
+companion are errors. There are no rule suppressions in application code. Runtime
+schemas validate memory JSON, stored snapshots, SDK/MCP responses, and Codex CLI
+messages; arbitrary JSON extension fields remain portable.
+
+Anti-slop is vendored in `tools/oxlint/anti-slop`; its [provenance](tools/oxlint/anti-slop/UPSTREAM.md)
+records the source revision, licenses, and Vite+ import adaptation. Installed agent
+assets, generated outputs, and third-party rule code are excluded from lint/format.
+Effect rules are not enabled because this implementation does not use Effect.
+`vitest.config.ts` keeps unit tests independent of the Worker plugin and live
+Artifacts. GitHub Actions runs check, tests, and build for changes to this demo.
 
 ## TypeScript client
 

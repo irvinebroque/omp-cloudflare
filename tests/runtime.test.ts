@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test } from "vite-plus/test";
 import assert from "node:assert/strict";
 import {
   applicable,
@@ -15,6 +15,7 @@ const memory: Memory = {
   created_at: "2026-11-06T00:00:00Z",
   body: "Use pnpm",
 };
+
 const repo = "https://github.com/acme/web";
 
 test("repository rules never become global and git remote syntaxes normalize", () => {
@@ -38,6 +39,7 @@ test("glob activation and applicability both need a matching relative path", () 
     applies_to: { level: "paths", repository: repo, globs: ["src/**"] },
     activation: { mode: "paths", globs: ["**/*.ts"] },
   };
+
   assert.equal(applicable(m, { repository: repo, paths: ["src/app.ts"] }), true);
   assert.equal(applicable(m, { repository: repo, paths: ["test/app.ts"] }), false);
   assert.equal(applicable(m, { repository: repo, paths: ["src/app.js"] }), false);
