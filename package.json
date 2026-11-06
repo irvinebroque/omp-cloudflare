@@ -1,0 +1,24 @@
+{
+  "name": "cloudflare-memory",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "cf dev",
+    "build": "cf build",
+    "deploy": "cf deploy",
+    "typecheck": "cf workers types && tsc",
+    "test": "node --test tests/*.test.ts",
+    "roundtrip": "node scripts/roundtrip.ts"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "beta",
+    "@types/node": "^26.6.6",
+    "cf": "^1.0.0-beta.17",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "isomorphic-git": "^1.44.11",
+    "memfs": "^4.80.0"
+  }
+}
