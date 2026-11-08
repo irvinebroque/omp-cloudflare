@@ -1,7 +1,0 @@
-{
-  "from": "2026-11-08T15:17:00+00:00",
-  "to": "2026-11-08T15:25:09.661523+00:00",
-  "service": "omp-cloudflare",
-  "errorEvents": 0,
-  "scope": "Observed verification window, not a soak or load test"
-}

@@ -24,10 +24,19 @@ Requires [Workers Paid and Artifacts access](https://developers.cloudflare.com/a
 
    [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/irvinebroque/omp-cloudflare)
 
-3. Use Node **24.22+** (24.x), keep `npm run build` and `npm run deploy`, and disable **Preview builds**. Check the [build permissions](docs/deployment.md#build-credentials).
+3. Use Node **24.22+** (24.x), keep `npm run build` and `npm run deploy`, and disable **Preview builds**. The build token needs Workers Scripts and Artifacts write access.
 4. Open your Worker URL. Select **Connect**, paste your access key, and connect.
 
-[CLI deployment and troubleshooting →](docs/deployment.md)
+To deploy from your checkout after `npm ci` and `npx cf auth login`:
+
+```sh
+export MEMORY_API_TOKEN=your-saved-key
+npm run deploy
+```
+
+### Access key
+
+Use the value saved as `MEMORY_API_TOKEN`. If someone shared their demo, ask them for its key. To replace a lost key, generate a new one and redeploy with it set. The key unlocks chat and both stores; keep it private. The browser forgets it on refresh. Cloudflare API tokens are separate deployment credentials.
 
 ## Run locally
 
@@ -41,7 +50,7 @@ npx cf auth login
 OMP_REMOTE_AI=true npm run dev
 ```
 
-Open **http://localhost:5173** and select **Connect**. The development access key is filled in for you. Local chat uses your account’s Workers AI. [Multiple accounts?](docs/deployment.md#choose-an-account)
+Open **http://localhost:5173** and select **Connect**. The development access key is filled in for you. Local chat uses your account’s Workers AI. Set `CLOUDFLARE_ACCOUNT_ID` to choose an account explicitly.
 
 ## Try it
 
@@ -53,9 +62,7 @@ To transfer memories, **Export** under **Memories**, connect to the other store,
 
 ## More
 
-- [HTTP and MCP examples](docs/clients.md)
 - [Codex setup](codex/README.md)
-- [Agent architecture](docs/agent.md) · [Protocol coverage and limits](docs/protocol.md)
-- [Contributing](CONTRIBUTING.md) · [Validation](docs/validation.md)
+- [Contributing and checks](CONTRIBUTING.md)
 
-Independent community example of the OMP v0.5 editors’ draft. [Maintenance and possible adoption](docs/ownership.md). Apache-2.0.
+Independent community example of the OMP v0.5 editors’ draft. Experimental routes are not adopted OMP standards. Apache-2.0.

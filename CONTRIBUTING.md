@@ -15,11 +15,11 @@ This starts local memory APIs without credentials. For the chat agent, use the [
 npm run verify
 ```
 
-`verify` runs strict checks, 21 unit tests, production builds, and the isolated HTTP/MCP/concurrency/exchange suite. It needs no Cloudflare credentials. [Validation details](docs/validation.md).
+`verify` runs strict checks, 21 unit tests, production builds, and the isolated HTTP/MCP/concurrency/exchange suite. It needs no Cloudflare credentials.
 
 Include regression evidence when changing persistence, exchange, pagination, authentication, or concurrency. Test with the real local simulator and MCP clients rather than module mocks.
 
-Preserve unknown metadata, original origins, and import receipts. Update `docs/protocol.md` when an experimental contract changes. Keep deployment discovery metadata and `cloudflare.config.ts` in sync, and test a clean setup before documenting a new deployment path. Platform beta upgrades need local and live validation.
+Preserve unknown metadata, original origins, and import receipts. Describe experimental contract changes in the pull request. Keep deployment discovery metadata and `cloudflare.config.ts` in sync, and test a clean setup before documenting a new deployment path. Platform beta upgrades need local and live validation.
 
 ```sh
 npm run format  # format files
@@ -47,7 +47,7 @@ tests/           Unit tests
 
 ## Reset local data
 
-Stop the development server, then remove `.cloudflare/state`. This resets local memories and conversations. [Deployment configuration](docs/deployment.md) covers alternate state directories and ports.
+Stop the development server, then remove `.cloudflare/state`. This resets local memories and conversations. Use `OMP_STATE_DIR` and `OMP_PORT` to override the local state directory and port.
 
 ## Protect private data
 

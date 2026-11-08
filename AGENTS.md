@@ -6,6 +6,6 @@ Use Vite+ for checks, tests, builds and script execution. `npm run dev/build` in
 
 Follow [Dillon Mulroy's anti-slop guidance](https://github.com/dmmulroy/anti-slop): validate external input, preserve known types, prefer direct typed calls, and test real dependencies. Keep this example small; do not vendor lint plugins or installer skills. Fix findings without suppressions, unsafe casts, broad types, or weakening strict settings. The custom anti-slop rules are not installed; Vite+'s native checks enforce formatting, type safety, and correctness.
 
-Protocol behavior follows the linked editors’ draft and the explicit experimental contract in `docs/protocol.md`. Preserve unknown JSON metadata and original identity. Never present experimental routes, runtime conventions or this repository as adopted OMP standards.
+Protocol behavior follows the OMP editors’ draft linked in the README. Preserve unknown JSON metadata and original identity. Never present experimental routes, runtime conventions or this repository as adopted OMP standards.
 
-Run `npm run verify` before pushing. E2E uses isolated local state. Live checks write disposable sample records and retain content in Git history; run only against an account you are authorized to use. Record live/browser/model checks accurately in `docs/validation.md`; do not claim a deploy-button success from a successful CLI deployment alone.
+Run `npm run verify` before pushing. E2E uses isolated local state. Live checks write disposable sample records and retain content in Git history; run only against an account you are authorized to use. Record live/browser/model checks accurately in the pull request; do not claim a deploy-button success from a successful CLI deployment alone.
