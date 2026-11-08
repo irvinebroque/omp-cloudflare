@@ -79,6 +79,14 @@ export async function decodeResponse<S extends z.ZodType>(
   response: Response,
   schema: S,
 ): Promise<z.output<S>> {
+  if (
+    response.headers.get("content-type")?.split(";").at(0)?.trim().toLowerCase() !==
+    "application/json"
+  )
+    throw new ApiError(
+      response.ok ? 502 : response.status,
+      `Expected a JSON memory response; received HTTP ${response.status} (${response.headers.get("content-type") ?? "no content type"})`,
+    );
   const payload: JsonInput = objectSchema.parse(await response.json());
 
   if (!response.ok) {
