@@ -41,7 +41,6 @@ src/server/      HTTP, MCP, authentication, and routing
 src/web/         Browser chat UI
 scripts/         Deployment, setup, and verification
 scripts/lib/     Internal HTTP client for verification
-codex/           MCP configuration and memory skill
 tests/           Unit tests
 ```
 

@@ -2,7 +2,7 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import { fileURLToPath } from "node:url";
 
-const ignored = ["codex/skills/**", ".cloudflare/**", ".wrangler/**", "dist/**"];
+const ignored = [".cloudflare/**", ".wrangler/**", "dist/**"];
 
 export default defineConfig({
   define: {

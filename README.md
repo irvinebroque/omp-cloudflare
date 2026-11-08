@@ -1,14 +1,32 @@
 # OMP on Cloudflare
 
-A chat agent with portable memory, built with [Pi](https://developers.cloudflare.com/agents/harnesses/pi/) and [Open Memory Protocol](https://github.com/The-AI-Disclosures-Project/Open-Memory-Protocol).
+[Open Memory Protocol (OMP)](https://github.com/The-AI-Disclosures-Project/Open-Memory-Protocol) is an open protocol for moving and sharing AI-agent memory: saved facts, preferences, and context that can travel between agents and memory providers.
+
+This example runs both an **OMP gateway** and the **memory stores** on Cloudflare Workers, with a [Pi chat agent](https://developers.cloudflare.com/agents/harnesses/pi/) to try them.
 
 [![Verify](https://github.com/irvinebroque/omp-cloudflare/actions/workflows/ci.yml/badge.svg)](https://github.com/irvinebroque/omp-cloudflare/actions/workflows/ci.yml)
 
 ```mermaid
-flowchart LR
-  Agent <--> Memories[OMP memories]
-  Memories <-->|Export / import| Store[Another store]
+flowchart TD
+  Client[External agents / MCP clients] --> Gateway
+  subgraph Worker[Cloudflare Worker]
+    Gateway[Gateway: search both stores / route writes] --> Memory[Memory API: read, write, export, import]
+    Chat[Pi chat demo] --> Memory
+  end
+  Memory --> Personal[(Personal Git repository)]
+  Memory --> Company[(Company Git repository)]
+  subgraph Artifacts[Cloudflare Artifacts]
+    Personal
+    Company
+  end
+  Memory <-->|Export / import| Other[Another memory store]
 ```
+
+- **Gateway:** gives clients one entry point to search Personal and Company together and choose where to save memories. HTTP endpoints live under `/gateway`; MCP clients connect to `/mcp`.
+- **Memory stores:** actually persist the records and serve reads, updates, deletions, and export/import under `/stores/personal` and `/stores/company`.
+- **Chat demo:** saves and recalls memories through the selected store. A new chat starts a new transcript while keeping saved memories.
+
+[Cloudflare Artifacts](https://developers.cloudflare.com/artifacts/) is managed, versioned storage with a Git-compatible interface. This example creates one Git repository per store in your Cloudflare account. Each holds an `omp-state.json` file containing memories and deletion markers; every mutation creates a Git commit. Deleting a memory removes it from current results but retains its Git history.
 
 ## Deploy
 
@@ -62,7 +80,6 @@ To transfer memories, **Export** under **Memories**, connect to the other store,
 
 ## More
 
-- [Codex setup](codex/README.md)
 - [Contributing and checks](CONTRIBUTING.md)
 
 Independent community example of the OMP v0.5 editors’ draft. Experimental routes are not adopted OMP standards. Apache-2.0.
