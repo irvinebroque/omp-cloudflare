@@ -62,7 +62,7 @@ Click **Deploy to Cloudflare** above. Cloudflare copies this template into your 
 
 1. Select your Cloudflare account and repository name.
 2. Generate a private token with `openssl rand -hex 32`. Enter it as **MEMORY_API_TOKEN** when prompted. Keep the value for your browser and clients.
-3. Keep the detected build command, `npm run build`, and deploy command, `npm run deploy`. Use Node 24.22+ in build settings.
+3. Keep the detected build command, `npm run build`, and deploy command, `npm run deploy`. Disable **Preview builds** for this example; its validated path is a production Worker. Use Node 24.22+ in build settings.
 4. Ensure the build’s Cloudflare API token can edit **Workers Scripts** and **Artifacts** in the selected account. The deploy script inspects or creates the `omp-cloudflare` namespace with `cf`, then deploys the Worker and its assets.
 5. Open the resulting Worker URL, enter your operator token, and select **Connect**. Both repositories initialize on first use.
 

@@ -165,7 +165,7 @@ try {
     tools,
     skill_found: true,
     verification:
-      "Fresh Codex app-server initialized the deployed MCP server and discovered its tools and installed skill. No model generation or new Codex thread was used.",
+      "Fresh Codex app-server initialized the configured MCP server and discovered its tools and installed skill. No model generation or new Codex thread was used.",
   };
 
   console.log(JSON.stringify(report, null, 2));

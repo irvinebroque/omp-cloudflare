@@ -113,7 +113,7 @@ export async function mutate<T>(
         fs,
         dir,
         message,
-        author: { name: "OMP Cloudflare prototype", email: "omp@example.invalid" },
+        author: { name: "OMP Cloudflare example", email: "omp@example.invalid" },
       });
 
       try {

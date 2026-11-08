@@ -21,6 +21,12 @@ const searchSchema = z.object({
   next_cursor: z.string().nullable(),
 });
 
+const importSchema = z.object({
+  manifest: json,
+  memories: z.array(json).max(100),
+  tombstones: z.array(json).default([]),
+});
+
 const exportSchema = z
   .object({
     manifest: z.object({ x_omp_identity_map: z.array(json).optional() }).catchall(json.optional()),
@@ -56,6 +62,18 @@ const status = element("status", HTMLPreElement);
 let selection: Selection | undefined;
 let cursor: string | null = null;
 let busy = false;
+
+function controlsDisabled(disabled: boolean) {
+  for (const control of document.querySelectorAll("button, input, select, textarea")) {
+    if (
+      control instanceof HTMLButtonElement ||
+      control instanceof HTMLInputElement ||
+      control instanceof HTMLSelectElement ||
+      control instanceof HTMLTextAreaElement
+    )
+      control.disabled = disabled;
+  }
+}
 
 if (import.meta.env.DEV) token.value = "local-development-token-only";
 
@@ -96,16 +114,12 @@ function action(operation: () => Promise<void>) {
   return () => {
     if (busy) return;
     busy = true;
-    document.querySelectorAll("button").forEach((button) => {
-      button.disabled = true;
-    });
+    controlsDisabled(true);
     void operation()
       .catch((error: Error) => report(error.message, true))
       .finally(() => {
         busy = false;
-        document.querySelectorAll("button").forEach((button) => {
-          button.disabled = false;
-        });
+        controlsDisabled(false);
       });
   };
 }
@@ -273,12 +287,27 @@ file.addEventListener(
 
     if (selected === null || selected === undefined) return;
 
-    if (selected.size > 1048576)
-      throw new Error(
-        "Import limit: 1 MiB. Use the SDK to import larger tombstone exports in pages.",
-      );
-    const snapshot = json.parse(JSON.parse(await selected.text()));
-    const receipt = await request("fmp/import", snapshot);
+    if (selected.size > 16 * 1048576)
+      throw new Error("File limit: 16 MiB. Imports are split into bounded API requests.");
+    const snapshot = importSchema.parse(JSON.parse(await selected.text()));
+
+    const receipt = await request("fmp/import", {
+      ...snapshot,
+      tombstones: snapshot.tombstones.slice(0, 50),
+    });
+
+    async function append(offset: number): Promise<void> {
+      if (offset >= snapshot.tombstones.length) return;
+      const manifest = z.object({}).catchall(json).parse(snapshot.manifest);
+      await request("fmp/import", {
+        manifest: { ...manifest, x_omp_identity_map: [] },
+        memories: [],
+        tombstones: snapshot.tombstones.slice(offset, offset + 50),
+      });
+      await append(offset + 50);
+    }
+
+    await append(50);
     file.value = "";
     clear();
     await load();

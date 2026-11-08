@@ -130,7 +130,7 @@ function project(target: string, memory: Memory) {
 }
 
 export function createServer(api: Api, base: URL): McpServer {
-  const server = new McpServer({ name: "omp-memory", version: "0.2.0" }, { instructions });
+  const server = new McpServer({ name: "omp-memory", version: "0.1.0" }, { instructions });
 
   async function call<S extends z.ZodType>(
     path: string,
@@ -156,7 +156,7 @@ export function createServer(api: Api, base: URL): McpServer {
         binding: "omp-cloudflare-mcp/0.1",
         instructions,
         conventions: {
-          applies_to: "Local experimental shape inspired by issue #22; not an adopted v0.3 schema.",
+          applies_to: "Local experimental shape inspired by issue #22; not an adopted OMP schema.",
           activation:
             "Local {mode, globs?, description?}; on_request requires context.explicit_request.",
           version:
