@@ -53,3 +53,9 @@ A version is a SHA-256 of canonical full memory JSON. It is an opaque optimistic
 ## Unsupported
 
 No adopted reference designation, full-profile conformance, official manifest schema, secure forgetting, cryptographic provenance, multi-tenant authorization, binary memory transport, move transfers, vector retrieval, automatic agent hooks, transcripts, file attachments, or realtime synchronization is claimed.
+
+## Git request isolation
+
+Each mutation creates its own in-memory filesystem and runs inside an `AsyncLocalStorage` lock scope. Vite aliases the `async-lock` import used by pinned `isomorphic-git` 1.44.11 to `src/storage/git-lock.ts`. That adapter implements the promise-mode `acquire` contract used by this dependency, including ordered batch keys. Locks serialize operations inside one mutation and never queue work from another request.
+
+The upstream library otherwise shares path/ref locks across an entire isolate, even when requests use separate filesystems. In live concurrent testing this caused Workers to cancel requests as hung. Keep the exact Git version pinned, retain the alias, and validate the adapter contract and live concurrency before upgrading it. Git's non-fast-forward rejection and bounded re-clone/reapply loop remain the guard against competing remote writes; these request-local locks do not replace that guard.

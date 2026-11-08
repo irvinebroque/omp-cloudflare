@@ -140,6 +140,7 @@ try {
   await run("npm", ["run", "roundtrip", "--", base], env);
   await run("npm", ["run", "mcp:roundtrip", "--", base], env);
   await run("npm", ["run", "regression:roundtrip", "--", base], env);
+  await run("npm", ["run", "concurrency:roundtrip", "--", base], env);
   const fullSnapshot = await client.snapshot();
   assert.ok(fullSnapshot.tombstones.length >= 51);
   await stop();

@@ -93,6 +93,14 @@ async function request(path: string, data?: JsonInput) {
   }
 
   const response = await fetch(`/stores/${store.value}/${path}`, options);
+
+  if (
+    response.headers.get("content-type")?.split(";").at(0)?.trim().toLowerCase() !==
+    "application/json"
+  )
+    throw new Error(
+      `HTTP ${response.status}: the server returned ${response.headers.get("content-type") ?? "no content type"} instead of JSON. Refresh to check the current record before retrying.`,
+    );
   const value = json.parse(await response.json());
 
   if (!response.ok) throw new Error(`${response.status}: ${JSON.stringify(value)}`);

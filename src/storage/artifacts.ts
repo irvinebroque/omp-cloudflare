@@ -2,6 +2,7 @@ import { clone, init, resolveRef, add, commit as gitCommit, push } from "isomorp
 import http from "isomorphic-git/http/web";
 import { createFsFromVolume, Volume } from "memfs";
 import { ApiError, stable, stateSchema, text, type State } from "../protocol/model.ts";
+import { withGitLockScope } from "./git-lock.ts";
 
 export const STORES = ["personal", "company"] as const;
 
@@ -59,88 +60,90 @@ export async function mutate<T>(
   message: string,
   apply: (state: State) => T,
 ): Promise<{ result: T; commit: string }> {
-  using repo = await repository(artifacts, store);
-  const info = await repo.info();
-  const token = await repo.createToken("write", 300);
+  return withGitLockScope(async () => {
+    using repo = await repository(artifacts, store);
+    const info = await repo.info();
+    const token = await repo.createToken("write", 300);
 
-  const onAuth = () => ({
-    username: "x",
-    password: text(token.plaintext.split("?expires=").at(0), "Artifact write token", 8192),
-  });
+    const onAuth = () => ({
+      username: "x",
+      password: text(token.plaintext.split("?expires=").at(0), "Artifact write token", 8192),
+    });
 
-  try {
-    async function attemptWrite(attempt: number): Promise<{ result: T; commit: string }> {
-      const fs = createFsFromVolume(new Volume());
-      const dir = "/memory";
-      const history = await repo.log({ ref: "main", limit: 1 });
+    try {
+      async function attemptWrite(attempt: number): Promise<{ result: T; commit: string }> {
+        const fs = createFsFromVolume(new Volume());
+        const dir = "/memory";
+        const history = await repo.log({ ref: "main", limit: 1 });
 
-      if (history.length > 0)
-        await clone({
+        if (history.length > 0)
+          await clone({
+            fs,
+            http,
+            dir,
+            url: info.remote,
+            ref: "main",
+            singleBranch: true,
+            depth: 1,
+            onAuth,
+          });
+        else await init({ fs, dir, defaultBranch: "main" });
+
+        const state =
+          history.length > 0
+            ? stateSchema.parse(
+                JSON.parse(String(await fs.promises.readFile(`${dir}/${FILE}`, "utf8"))),
+              )
+            : empty(info.id);
+
+        const before = stable(state);
+        const result = apply(state);
+
+        if (before === stable(state) && history.length > 0)
+          return { result, commit: await resolveRef({ fs, dir, ref: "HEAD" }) };
+        await fs.promises.writeFile(`${dir}/${FILE}`, JSON.stringify(state, null, 2) + "\n");
+        await fs.promises.writeFile(
+          `${dir}/MEMORY.md`,
+          "# OMP memory\n\n" +
+            state.memories.map((m) => `- ${m.identifier}: ${m.title ?? "(untitled)"}`).join("\n") +
+            "\n\nFull objects and extension fields are in omp-state.json.\n",
+        );
+        await add({ fs, dir, filepath: FILE });
+        await add({ fs, dir, filepath: "MEMORY.md" });
+
+        const commit = await gitCommit({
           fs,
-          http,
           dir,
-          url: info.remote,
-          ref: "main",
-          singleBranch: true,
-          depth: 1,
-          onAuth,
+          message,
+          author: { name: "OMP Cloudflare example", email: "omp@example.invalid" },
         });
-      else await init({ fs, dir, defaultBranch: "main" });
 
-      const state =
-        history.length > 0
-          ? stateSchema.parse(
-              JSON.parse(String(await fs.promises.readFile(`${dir}/${FILE}`, "utf8"))),
-            )
-          : empty(info.id);
+        try {
+          const pushed = await push({ fs, http, dir, url: info.remote, ref: "main", onAuth });
 
-      const before = stable(state);
-      const result = apply(state);
+          if (
+            !pushed.ok ||
+            pushed.error !== undefined ||
+            Object.values(pushed.refs).some((r) => !r.ok)
+          )
+            throw new ApiError(409, "Artifact push was rejected");
 
-      if (before === stable(state) && history.length > 0)
-        return { result, commit: await resolveRef({ fs, dir, ref: "HEAD" }) };
-      await fs.promises.writeFile(`${dir}/${FILE}`, JSON.stringify(state, null, 2) + "\n");
-      await fs.promises.writeFile(
-        `${dir}/MEMORY.md`,
-        "# OMP memory\n\n" +
-          state.memories.map((m) => `- ${m.identifier}: ${m.title ?? "(untitled)"}`).join("\n") +
-          "\n\nFull objects and extension fields are in omp-state.json.\n",
-      );
-      await add({ fs, dir, filepath: FILE });
-      await add({ fs, dir, filepath: "MEMORY.md" });
+          return { result, commit };
+        } catch (error) {
+          // A simultaneous writer may have advanced main. Re-clone and reapply to its state.
+          const latest = await repo.log({ ref: "main", limit: 1 });
 
-      const commit = await gitCommit({
-        fs,
-        dir,
-        message,
-        author: { name: "OMP Cloudflare example", email: "omp@example.invalid" },
-      });
+          if (attempt === 3 || latest[0]?.hash === history[0]?.hash) throw error;
 
-      try {
-        const pushed = await push({ fs, http, dir, url: info.remote, ref: "main", onAuth });
-
-        if (
-          !pushed.ok ||
-          pushed.error !== undefined ||
-          Object.values(pushed.refs).some((r) => !r.ok)
-        )
-          throw new ApiError(409, "Artifact push was rejected");
-
-        return { result, commit };
-      } catch (error) {
-        // A simultaneous writer may have advanced main. Re-clone and reapply to its state.
-        const latest = await repo.log({ ref: "main", limit: 1 });
-
-        if (attempt === 3 || latest[0]?.hash === history[0]?.hash) throw error;
-
-        return attemptWrite(attempt + 1);
+          return attemptWrite(attempt + 1);
+        }
       }
-    }
 
-    return await attemptWrite(0);
-  } finally {
-    await revokeWriteToken(() => repo.revokeToken(token.plaintext));
-  }
+      return await attemptWrite(0);
+    } finally {
+      await revokeWriteToken(() => repo.revokeToken(token.plaintext));
+    }
+  });
 }
 
 /** Token TTL bounds a cleanup failure; cleanup must not replace a committed result or primary error. */

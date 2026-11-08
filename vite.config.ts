@@ -1,5 +1,6 @@
 import { cloudflare } from "@cloudflare/vite-plugin";
 import { defineConfig, lazyPlugins } from "vite-plus";
+import { fileURLToPath } from "node:url";
 
 const ignored = [
   ".agent/**",
@@ -21,6 +22,15 @@ const ignored = [
 ];
 
 export default defineConfig({
+  environments: { ssr: { optimizeDeps: { exclude: ["async-lock"] } } },
+  resolve: {
+    alias: [
+      {
+        find: /^async-lock$/u,
+        replacement: fileURLToPath(new URL("./src/storage/git-lock.ts", import.meta.url).href),
+      },
+    ],
+  },
   fmt: { ignorePatterns: ignored },
   lint: {
     ignorePatterns: ignored,
