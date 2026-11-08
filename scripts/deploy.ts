@@ -1,3 +1,4 @@
+import { project } from "./project-settings.ts";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -11,7 +12,7 @@ function cf(args: string[], capture = false) {
   return result;
 }
 
-const namespace = process.env.OMP_NAMESPACE ?? "omp-cloudflare";
+const namespace = process.env.OMP_NAMESPACE ?? project.name;
 const existing = cf(["artifacts", "namespaces", "get", namespace], true);
 
 if (existing.status !== 0) {

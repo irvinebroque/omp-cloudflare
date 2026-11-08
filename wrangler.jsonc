@@ -1,6 +1,6 @@
 {
-  // Deploy-button discovery metadata. cf uses cloudflare.config.ts for development and deployment.
-  // Keep name, compatibility date, and binding names aligned; review both when changing this contract.
+  // Deploy-button metadata. cf reads name and compatibility_date from this file.
+  // Worker behavior and bindings are configured in cloudflare.config.ts.
   "name": "omp-cloudflare",
   "main": "src/index.ts",
   "compatibility_date": "2026-11-08",

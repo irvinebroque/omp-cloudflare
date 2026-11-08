@@ -1,15 +1,16 @@
 import { bindings, defineConfig } from "cf/config";
+import { project } from "./scripts/project-settings.ts";
 import * as entrypoint from "./src/index.ts" with { type: "cf-worker" };
 
 export default defineConfig(({ mode }) => ({
   worker: {
-    name: process.env.WORKERS_CI_WORKER_NAME ?? process.env.OMP_WORKER_NAME ?? "omp-cloudflare",
-    compatibilityDate: "2026-11-08",
+    name: process.env.OMP_WORKER_NAME ?? project.name,
+    compatibilityDate: project.compatibility_date,
     compatibilityFlags: ["nodejs_compat"],
     entrypoint,
     env: {
       ARTIFACTS: bindings.artifacts({
-        namespace: process.env.OMP_NAMESPACE ?? "omp-cloudflare",
+        namespace: process.env.OMP_NAMESPACE ?? project.name,
         dev: { remote: false },
       }),
       MEMORY_API_TOKEN:

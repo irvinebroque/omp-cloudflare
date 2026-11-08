@@ -4,6 +4,7 @@ import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as pause } from "node:timers/promises";
+import { ApiError } from "../src/protocol/model.ts";
 import { OmpClient } from "../sdk/client.ts";
 
 const temporary = await mkdtemp(join(tmpdir(), "omp-e2e-"));
@@ -75,10 +76,38 @@ try {
   assert.equal((await fetch(base + "/stores/personal/fmp/read_inferences")).status, 401);
   assert.equal((await fetch(base + "/mcp")).status, 401);
 
+  const headers = { authorization: "Bearer " + token, "content-type": "application/json" };
+  assert.equal(
+    (await fetch(base + "/stores/personal/fmp/import", { method: "POST", headers, body: "{" }))
+      .status,
+    400,
+  );
+  assert.equal(
+    (
+      await fetch(base + "/stores/personal/fmp/import", {
+        method: "POST",
+        headers: { ...headers, "content-type": "text/application/json" },
+        body: "{}",
+      })
+    ).status,
+    415,
+  );
+  assert.equal(
+    (
+      await fetch(base + "/stores/personal/fmp/import", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ oversized: "x".repeat(1048576) }),
+      })
+    ).status,
+    413,
+  );
+
   const saved = await client.remember({
     identifier: "restart-canary",
     body: "Survives a process restart",
     custom: { nested: [1, true, null] },
+    links: [{ target: "restart-canary", rel: "self" }],
   });
 
   const origin = saved.memory.x_omp_origin;
@@ -111,6 +140,8 @@ try {
   await run("npm", ["run", "roundtrip", "--", base], env);
   await run("npm", ["run", "mcp:roundtrip", "--", base], env);
   await run("npm", ["run", "regression:roundtrip", "--", base], env);
+  const fullSnapshot = await client.snapshot();
+  assert.ok(fullSnapshot.tombstones.length >= 51);
   await stop();
   await start(join(temporary, "second"));
 
@@ -122,6 +153,12 @@ try {
   assert.notEqual(independent.memory.x_omp_origin, origin);
   assert.equal((await client.import(snapshot)).receipts[0]?.status, "accepted");
   assert.deepEqual((await client.read("restart-canary")).memory, saved.memory);
+  await client.importSnapshot(fullSnapshot);
+  await assert.rejects(
+    () => client.read("restart-canary"),
+    (error: Error) => error instanceof ApiError && error.status === 404,
+  );
+  console.log("PASS bounded request validation and full SDK multi-page snapshots");
   console.log(
     "PASS authentication, public UI, process restart, separate origins, independent Python file-store exchange, HTTP, MCP, concurrency and regression suites",
   );

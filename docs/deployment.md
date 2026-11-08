@@ -15,7 +15,7 @@ The CLI entry point is `npm run deploy`, which runs `scripts/deploy.ts` with Vit
 | `OMP_STATE_DIR`          | `.cloudflare/state`    | Local simulator persistence                                       |
 | `OMP_PORT`               | `5173`                 | Local server port                                                 |
 
-`cloudflare.config.ts` is authoritative for `cf`. The small `wrangler.jsonc` exists for the deploy-button discovery service. It has no account ID, credentials, or resource IDs. Keep binding names, default namespace, compatibility date and name aligned when editing the template. The deploy script handles Artifacts because it is absent from the button’s automatic provisioning list.
+`cloudflare.config.ts` is authoritative for `cf`. The small `wrangler.jsonc` exists for the deploy-button discovery service. It has no account ID, credentials, or resource IDs. The project name and compatibility date are read from it by `scripts/project-settings.ts`, so a name rewritten by the deploy button is also used by `cf`. The default namespace follows that project name; explicit `OMP_NAMESPACE` overrides it. The deploy script handles Artifacts because it is absent from the button’s automatic provisioning list.
 
 A copied template can share one namespace across repeated deployments. To isolate a second instance, set a different namespace. `personal` and `company` repositories are created lazily through the binding. Their Artifacts IDs supply stable store origins; neither account IDs nor hardcoded deployment names are used as memory identities.
 

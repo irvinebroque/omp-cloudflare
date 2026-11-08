@@ -36,7 +36,10 @@ const json = (value: JsonInput, status = 200) =>
   Response.json(value, { status, headers: { "cache-control": "no-store" } });
 
 async function body(request: Request): Promise<Record<string, Json>> {
-  if (request.headers.get("content-type")?.includes("application/json") !== true)
+  if (
+    request.headers.get("content-type")?.split(";").at(0)?.trim().toLowerCase() !==
+    "application/json"
+  )
     throw new ApiError(415, "Use application/json");
 
   if (request.body === null) throw new ApiError(400, "JSON body required");

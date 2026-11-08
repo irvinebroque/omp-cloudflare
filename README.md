@@ -66,7 +66,7 @@ Click **Deploy to Cloudflare** above. Cloudflare copies this template into your 
 4. Ensure the build’s Cloudflare API token can edit **Workers Scripts** and **Artifacts** in the selected account. The deploy script inspects or creates the `omp-cloudflare` namespace with `cf`, then deploys the Worker and its assets.
 5. Open the resulting Worker URL, enter your operator token, and select **Connect**. Both repositories initialize on first use.
 
-`wrangler.jsonc` supplies the metadata the button discovers. `cloudflare.config.ts` is the configuration used by `cf`. The build-provided `WORKERS_CI_WORKER_NAME` takes precedence over the default name, so you can rename your Worker in the deployment flow. Artifacts is not in the button’s [automatic resource list](https://developers.cloudflare.com/workers/platform/deploy-buttons/); provisioning is handled by our deploy script. See [deployment details and troubleshooting](docs/deployment.md).
+`wrangler.jsonc` supplies the metadata the button discovers. `cloudflare.config.ts` is the configuration used by `cf`. `cf` reads the project name and compatibility date from that metadata, including changes made by the deploy button. The default namespace follows the copied project’s name. Artifacts is not in the button’s [automatic resource list](https://developers.cloudflare.com/workers/platform/deploy-buttons/); provisioning is handled by our deploy script. See [deployment details and troubleshooting](docs/deployment.md).
 
 ### Deploy with the Cloudflare CLI
 
