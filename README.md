@@ -20,6 +20,13 @@ flowchart LR
   Personal <-->|OMP JSON snapshot| Folder[Independent Python folder adapter]
 ```
 
+<details>
+<summary>Browser demo: a memory copied into another store</summary>
+
+![The deployed browser demo reading an imported memory with its original origin retained.](docs/images/demo.png)
+
+</details>
+
 ## Run locally
 
 You need Node **24.22+** within the 24.x line (or 26.12+ within 26.x), npm, and Python 3.10+ for the independent exchange test. Local development needs no Cloudflare login or paid plan.

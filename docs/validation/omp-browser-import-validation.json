@@ -1,0 +1,6 @@
+{
+  "checkedAt": "2026-11-08T15:20:06.874Z",
+  "source": "live browser controls",
+  "snapshotTombstones": 134,
+  "receiptText": "Import receipts (check for rejected identities):\n{\n  \"receipts\": [\n    {\n      \"identifier\": \"535f15c6-a15e-4193-8a7a-c61baec9b559\",\n      \"origin\": \"cloudflare-artifacts:ofbkst0a9quz31m9\",\n      \"status\": \"accepted\"\n    },\n    {\n      \"identifier\": \"smoke-df6527bb-b1fa-4ec6-8a5e-740d86164c7d-b\",\n      \"origin\": \"cloudflare-artifacts:ofbkst0a9quz31m9\",\n      \"status\": \"accepted\"\n    }\n  ],\n  \"commit\": \"bc15c9fc90db78e8d51bfae4154a573a3228752b\"\n}"
+}

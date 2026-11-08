@@ -1,0 +1,16 @@
+{
+  "checked_at": "2026-11-08T15:00:58.022Z",
+  "codex": "codex-cli 0.162.1",
+  "mcp": "omp-memory",
+  "tools": [
+    "about_omp",
+    "add_memory",
+    "delete_memory",
+    "get_memory",
+    "search_memories",
+    "update_memory"
+  ],
+  "skill_found": true,
+  "verification": "Fresh Codex app-server initialized the configured local MCP server and discovered its tools and installed skill. No model generation or new Codex thread was used.",
+  "target": "http://localhost:5173/mcp"
+}

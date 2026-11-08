@@ -1,0 +1,62 @@
+{
+  "checkedAt": "2026-11-08T15:24:38.218395+00:00",
+  "sourceCommit": "020930194df2128d27ed1e98b7ffb21bb7e6c799",
+  "workerVersion": "156397ab-3294-4e8a-a23d-3750630ec1b7",
+  "runs": [
+    {
+      "script": "roundtrip",
+      "ok": true,
+      "base": "https://omp-cloudflare.roundtrip.workers.dev",
+      "storage": "Cloudflare Artifacts",
+      "sourceCommit": "00131f30cfc745bd53f7b81f73d33f2d980897f3",
+      "destinationCommit": "a7247e5acba486bb8bafe5652d76315df27f7547",
+      "checks": [
+        "write committed to Cloudflare Artifacts",
+        "fresh HTTP request reads persisted object",
+        "search finds saved memory",
+        "gateway routes personal/company writes into separate Artifacts repositories",
+        "one gateway search returns attributed results from both connected stores",
+        "cross-store export/import preserves all fields and origin",
+        "repeated import is idempotent",
+        "export back to original store preserves identity",
+        "identity conflict rejected without data loss",
+        "local update persists",
+        "concurrent writes survive without lost updates",
+        "deleted identity cannot return through stale import",
+        "Git history records mutations; smoke memories removed from current views",
+        "invalid bodies return 400"
+      ]
+    },
+    {
+      "script": "mcp:roundtrip",
+      "url": "https://omp-cloudflare.roundtrip.workers.dev/mcp",
+      "checked_at": "2026-11-08T15:23:28.599Z",
+      "passed": 8,
+      "checks": [
+        "MCP initialize and six-tool discovery",
+        "Capability discovery and resource read",
+        "Writes route to separate stores; search returns summaries and get returns provenance",
+        "Repository rules do not leak through search or direct reads",
+        "Path and on-request activation filter correctly",
+        "Stale edits/deletes fail; unrelated writes do not invalidate per-memory versions",
+        "Invalid applicability and unknown tool arguments are rejected",
+        "Concurrent edits from the same version produce one winner and one conflict"
+      ],
+      "cleanup": "Removed test memories from current views; history and tombstones retained."
+    },
+    {
+      "script": "regression:roundtrip",
+      "ok": true,
+      "base": "https://omp-cloudflare.roundtrip.workers.dev",
+      "verifiedAt": "2026-11-08T15:24:15.543Z",
+      "checks": [
+        "MCP preserves opaque identifiers, stubs, evidence, and extension metadata",
+        "unsupported provenance update returns 409 without altering evidence",
+        "MCP paginates both stores and prioritizes an old always-active preference",
+        "pagination detects concurrent store changes instead of silently skipping results",
+        "mixed-origin export/import preserves both identities and repeated copies are idempotent",
+        "multi-page live exports transfer every tombstone and block stale-copy resurrection"
+      ]
+    }
+  ]
+}

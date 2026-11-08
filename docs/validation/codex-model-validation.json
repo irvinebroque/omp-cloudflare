@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "base": "https://omp-cloudflare.roundtrip.workers.dev",
+  "sessions": 2,
+  "checks": [
+    "model MCP save",
+    "independent REST persistence",
+    "fresh model MCP search",
+    "fresh model MCP get",
+    "random value recalled without prompt leakage"
+  ],
+  "verifiedAt": "2026-11-08T15:19:15.620Z"
+}
