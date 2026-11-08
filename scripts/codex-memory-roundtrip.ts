@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
 import { OmpClient } from "../sdk/client.ts";
-import { ApiError, jsonValue } from "../src/model.ts";
+import { ApiError, jsonValue } from "../src/protocol/model.ts";
 
 const execute = promisify(execFile);
-const base = process.argv[2] ?? "https://ompi-memory.roundtrip.workers.dev";
+const base = process.argv[2] ?? "http://localhost:5173";
 const label = "codex-canary-" + crypto.randomUUID();
 const secret = crypto.randomUUID();
-const memory = new OmpClient(base);
+const memory = new OmpClient(base, "personal", process.env.OMP_API_TOKEN ?? "");
 const directory = await mkdtemp(join(tmpdir(), "omp-codex-"));
 
 const eventSchema = z
@@ -44,6 +44,8 @@ async function session(prompt: string) {
       directory,
       "-c",
       "mcp_servers.omp-memory.url=" + JSON.stringify(base.replace(/\/$/u, "") + "/mcp"),
+      "-c",
+      'mcp_servers.omp-memory.bearer_token_env_var="OMP_API_TOKEN"',
       prompt,
     ],
     { timeout: 180000, maxBuffer: 4 * 1024 * 1024 },
@@ -59,6 +61,13 @@ async function session(prompt: string) {
 }
 
 try {
+  await mkdir(join(directory, ".agents/skills"), { recursive: true });
+  await cp(
+    new URL("../codex/skills/omp-memory", import.meta.url),
+    join(directory, ".agents/skills/omp-memory"),
+    { recursive: true },
+  );
+
   const saved = await session(
     `Use $omp-memory and only its MCP tools (no shell or local files). Save sample personal memory with identifier ${label}, body "Demo verification value: ${secret}", applies_to user, contributor agent:codex, activation always. Confirm the successful add_memory call.`,
   );

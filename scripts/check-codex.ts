@@ -3,7 +3,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { createInterface } from "node:readline";
 import { writeFile } from "node:fs/promises";
 import { z } from "zod";
-import { jsonValue, type JsonInput } from "../src/model.ts";
+import { jsonValue, type JsonInput } from "../src/protocol/model.ts";
 
 // Exercise Codex's own MCP client and skill scanner without a model request/login.
 const child = spawn("codex", ["app-server", "--stdio"], { stdio: ["pipe", "pipe", "pipe"] });

@@ -1,25 +1,50 @@
 import { clone, init, resolveRef, add, commit as gitCommit, push } from "isomorphic-git";
 import http from "isomorphic-git/http/web";
 import { createFsFromVolume, Volume } from "memfs";
-import { ApiError, stable, stateSchema, text, type State } from "./model.ts";
+import { ApiError, stable, stateSchema, text, type State } from "../protocol/model.ts";
 
 export const STORES = ["personal", "company"] as const;
 
 export type Store = (typeof STORES)[number];
 
 const FILE = "omp-state.json";
-const origin = (store: Store) => `cloudflare-artifacts:ompi-memory-prototype/${store}`;
-const empty = (store: Store): State => ({ origin: origin(store), memories: [], tombstones: [] });
+
+const empty = (id: string): State => ({
+  origin: "cloudflare-artifacts:" + id,
+  memories: [],
+  tombstones: [],
+});
+
+/** Artifacts assigns each repo a stable ID, including in the local simulator. */
+async function repository(artifacts: Artifacts, store: Store): Promise<ArtifactsRepo> {
+  try {
+    return await artifacts.get(store);
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "NOT_FOUND") throw error;
+  }
+
+  try {
+    const created = await artifacts.create(store, { setDefaultBranch: "main" });
+    using repo = await artifacts.get(store);
+    await repo.revokeToken(created.token);
+  } catch (error) {
+    // Two first requests may race to initialize the same repository.
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ALREADY_EXISTS")
+      throw error;
+  }
+
+  return artifacts.get(store);
+}
 
 export async function read(
   artifacts: Artifacts,
   store: Store,
 ): Promise<{ state: State; commit: string | null }> {
-  using repo = await artifacts.get(store);
+  using repo = await repository(artifacts, store);
   const history = await repo.log({ ref: "main", limit: 1 });
   const commit = history[0]?.hash ?? null;
 
-  if (commit === null) return { state: empty(store), commit: null };
+  if (commit === null) return { state: empty((await repo.info()).id), commit: null };
   const blob = await repo.readFile({ ref: commit, path: FILE });
 
   if (blob === null) throw new Error("Artifact state file missing");
@@ -34,7 +59,7 @@ export async function mutate<T>(
   message: string,
   apply: (state: State) => T,
 ): Promise<{ result: T; commit: string }> {
-  using repo = await artifacts.get(store);
+  using repo = await repository(artifacts, store);
   const info = await repo.info();
   const token = await repo.createToken("write", 300);
 
@@ -67,7 +92,7 @@ export async function mutate<T>(
           ? stateSchema.parse(
               JSON.parse(String(await fs.promises.readFile(`${dir}/${FILE}`, "utf8"))),
             )
-          : empty(store);
+          : empty(info.id);
 
       const before = stable(state);
       const result = apply(state);

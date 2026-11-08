@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f4f3ef" />
+    <link rel="stylesheet" href="/src/web/style.css" />
+    <title>OMP · Memory on Cloudflare</title>
+    <script type="module" src="/src/web/main.ts"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <a class="wordmark" href="https://github.com/irvinebroque/omp-cloudflare"
+          >OMP / Cloudflare ↗</a
+        ><span class="badge">Community example · draft v0.5</span>
+      </header>
+      <section class="intro">
+        <p class="eyebrow">PORTABLE CONTEXT</p>
+        <h1>A memory you can take with you.</h1>
+        <p>
+          Write a memory, find it again, and move it to another store. Every change is a Git commit
+          in your Cloudflare account.
+        </p>
+      </section>
+      <section class="connection" aria-label="Connection">
+        <label
+          >Operator token<input
+            id="token"
+            type="password"
+            autocomplete="off"
+            placeholder="Enter your MEMORY_API_TOKEN"
+        /></label>
+        <label
+          >Store<select id="store">
+            <option value="personal">Personal</option>
+            <option value="company">Company</option>
+          </select></label
+        >
+        <button id="connect" type="button">Connect</button>
+        <p class="hint">
+          The token stays in this tab’s memory. Both stores share it. Deletion keeps Git history.
+        </p>
+      </section>
+      <section class="workspace">
+        <div class="panel">
+          <div class="panel-title">
+            <h2>Your memories</h2>
+            <button id="refresh" class="quiet" type="button">Refresh</button>
+          </div>
+          <form id="search-form">
+            <label for="query">Search this store</label>
+            <div class="inline">
+              <input id="query" type="search" placeholder="Keywords, or leave empty" /><button
+                type="submit"
+              >
+                Search
+              </button>
+            </div>
+          </form>
+          <p id="count" class="hint">Connect to load your memories.</p>
+          <ul id="results"></ul>
+          <button id="more" class="quiet" hidden type="button">Load more</button>
+        </div>
+        <div class="panel">
+          <div class="panel-title">
+            <h2 id="editor-title">New memory</h2>
+            <button id="new" class="quiet" type="button">New</button>
+          </div>
+          <form id="editor">
+            <label
+              >Title <span class="hint">optional</span
+              ><input id="title" maxlength="256" placeholder="Something worth remembering" /></label
+            ><label
+              >Body<textarea
+                id="body"
+                required
+                rows="8"
+                placeholder="The user prefers concise answers with working code examples."
+              ></textarea></label
+            ><label
+              >Format<select id="media">
+                <option value="text/markdown">Markdown</option>
+                <option value="text/plain">Plain text</option>
+                <option value="application/json">JSON</option>
+              </select></label
+            >
+            <div class="actions">
+              <button id="save" type="submit">Save memory</button
+              ><button id="delete" class="danger quiet" hidden type="button">Delete</button>
+            </div>
+          </form>
+          <p id="reference" class="hint"></p>
+        </div>
+      </section>
+      <section class="transfer">
+        <div>
+          <h2>Take your memories with you</h2>
+          <p>
+            Export a JSON snapshot, switch stores, then import it. Unknown metadata travels with
+            each memory.
+          </p>
+        </div>
+        <div class="actions">
+          <button id="export" class="quiet" type="button">Export snapshot</button
+          ><label class="file-button"
+            >Import snapshot<input id="import" type="file" accept="application/json,.json"
+          /></label>
+        </div>
+      </section>
+      <pre id="status" role="status" aria-live="polite">
+Ready. Start locally, or enter your deployment’s operator token.</pre>
+      <footer>
+        <a href="https://github.com/irvinebroque/omp-cloudflare#readme">Setup & documentation ↗</a
+        ><span
+          >Experimental HTTP + MCP binding. Single operator. Up to 100 active memories per
+          store.</span
+        >
+      </footer>
+    </main>
+  </body>
+</html>

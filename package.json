@@ -1,23 +1,34 @@
 {
-  "name": "cloudflare-memory",
+  "name": "omp-cloudflare",
+  "version": "0.1.0",
   "private": true,
+  "description": "An Open Memory Protocol v0.5 example on Cloudflare Workers and Artifacts",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/irvinebroque/omp-cloudflare.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "cf dev",
     "build": "cf build",
-    "deploy": "cf deploy",
-    "typecheck": "cf workers types && tsc",
-    "roundtrip": "node scripts/roundtrip.ts",
-    "mcp:roundtrip": "node scripts/mcp-roundtrip.ts",
-    "codex:setup": "node scripts/setup-codex.ts",
-    "codex:check": "node scripts/check-codex.ts",
-    "check": "cf workers types && vp check --deny-warnings",
+    "deploy": "vpx scripts/deploy.ts",
+    "typecheck": "cf workers types && tsc && tsc -p src/web",
+    "roundtrip": "vpx scripts/roundtrip.ts",
+    "mcp:roundtrip": "vpx scripts/mcp-roundtrip.ts",
+    "codex:setup": "vpx scripts/setup-codex.ts",
+    "codex:check": "vpx scripts/check-codex.ts",
+    "check": "cf workers types && vp check --deny-warnings && tsc -p src/web",
     "lint": "cf workers types && vp lint --deny-warnings",
     "lint:fix": "vp lint --fix",
     "format": "vp fmt",
     "format:check": "vp fmt --check",
-    "codex:roundtrip": "node scripts/codex-memory-roundtrip.ts",
-    "regression:roundtrip": "node scripts/regression-roundtrip.ts"
+    "codex:roundtrip": "vpx scripts/codex-memory-roundtrip.ts",
+    "regression:roundtrip": "vpx scripts/regression-roundtrip.ts",
+    "test": "vp test run",
+    "test:e2e": "vpx scripts/test-e2e.ts",
+    "verify": "npm run check && npm test && npm run build && npm run test:e2e",
+    "test:quality": "vpx scripts/check-quality.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.4.0",
@@ -43,5 +54,12 @@
   "engines": {
     "node": "^24.22.0 || ^26.12.0"
   },
-  "packageManager": "npm@11.19.1"
+  "packageManager": "npm@11.19.1",
+  "cloudflare": {
+    "bindings": {
+      "MEMORY_API_TOKEN": {
+        "description": "A private bearer token of at least 24 characters. Generate one with `openssl rand -hex 32`. Enter it in the browser demo or set OMP_API_TOKEN for clients."
+      }
+    }
+  }
 }

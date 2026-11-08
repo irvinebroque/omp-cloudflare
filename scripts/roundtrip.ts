@@ -6,8 +6,8 @@ const base = process.argv[2];
 if (base === undefined)
   throw new Error("Usage: npm run roundtrip -- https://your-worker.workers.dev");
 
-const personal = new OmpClient(base, "personal"),
-  destination = new OmpClient(base, "company");
+const personal = new OmpClient(base, "personal", process.env.OMP_API_TOKEN ?? ""),
+  destination = new OmpClient(base, "company", process.env.OMP_API_TOKEN ?? "");
 
 const id = `smoke-${crypto.randomUUID()}`;
 const checks: string[] = [];
@@ -17,7 +17,7 @@ function pass(message: string) {
   console.error("PASS " + message);
 }
 
-const gateway = new OmpGateway(base);
+const gateway = new OmpGateway(base, process.env.OMP_API_TOKEN ?? "");
 
 assert.deepEqual((await gateway.info()).connected_stores, ["personal", "company"]);
 
@@ -178,7 +178,10 @@ pass("Git history records mutations; smoke memories removed from current views")
 
 const invalid = await fetch(`${base}/stores/personal/fmp/upload/inferences`, {
   method: "POST",
-  headers: { "content-type": "application/json" },
+  headers: {
+    "content-type": "application/json",
+    authorization: "Bearer " + (process.env.OMP_API_TOKEN ?? ""),
+  },
   body: JSON.stringify({ memory: { body: 42 } }),
 });
 

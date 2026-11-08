@@ -1,0 +1,3 @@
+# Production: generate a unique private value with openssl rand -hex 32.
+# Local development uses its own fixed simulator token, defined in cloudflare.config.ts.
+MEMORY_API_TOKEN=replace-with-a-random-private-token-of-at-least-24-characters

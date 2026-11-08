@@ -3,16 +3,16 @@ import { writeFile } from "node:fs/promises";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { z } from "zod";
 import { OmpClient, OmpGateway, type Store } from "../sdk/client.ts";
-import { ApiError, archive, type JsonInput, type Memory } from "../src/model.ts";
-import { readResponse } from "../src/contracts.ts";
+import { ApiError, archive, type JsonInput, type Memory } from "../src/protocol/model.ts";
+import { readResponse } from "../src/protocol/contracts.ts";
 
-const base = process.argv[2] ?? "https://ompi-memory.roundtrip.workers.dev";
-const personal = new OmpClient(base);
-const company = new OmpClient(base, "company");
-const gateway = new OmpGateway(base);
+const base = process.argv[2] ?? "http://localhost:5173";
+const personal = new OmpClient(base, "personal", process.env.OMP_API_TOKEN ?? "");
+const company = new OmpClient(base, "company", process.env.OMP_API_TOKEN ?? "");
+const gateway = new OmpGateway(base, process.env.OMP_API_TOKEN ?? "");
 const mcp = new Client({ name: "omp-regression", version: "1" });
 const prefix = "regression-" + crypto.randomUUID();
-const created: { store: Store; identifier: string; origin?: string }[] = [];
+const created: { store: Store; identifier: string; origin?: string | undefined }[] = [];
 const checks: string[] = [];
 
 const passed = (name: string) => {
@@ -35,7 +35,11 @@ async function tool(name: string, args: Record<string, JsonInput>) {
 }
 
 try {
-  await mcp.connect(new StreamableHTTPClientTransport(new URL(base + "/mcp")));
+  await mcp.connect(
+    new StreamableHTTPClientTransport(new URL(base + "/mcp"), {
+      requestInit: { headers: { authorization: "Bearer " + (process.env.OMP_API_TOKEN ?? "") } },
+    }),
+  );
   const id = " " + prefix + " ";
 
   const stored = await personal.remember({
@@ -223,7 +227,10 @@ try {
     await previous;
 
     try {
-      await new OmpClient(base, ref.store).delete(ref.identifier, ref.origin);
+      await new OmpClient(base, ref.store, process.env.OMP_API_TOKEN ?? "").delete(
+        ref.identifier,
+        ref.origin,
+      );
     } catch (error) {
       if (!(error instanceof ApiError && error.status === 404)) throw error;
     }

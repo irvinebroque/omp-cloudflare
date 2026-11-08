@@ -4,7 +4,7 @@
     "lib": ["es2024"],
     "module": "preserve",
     "moduleResolution": "bundler",
-    "types": ["node"],
+    "types": ["node", "vite-plus/client"],
     "strict": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
@@ -15,7 +15,8 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noImplicitOverride": true
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true
   },
   "include": [
     "src",
@@ -23,6 +24,8 @@
     ".cloudflare/types",
     "sdk",
     "scripts",
-    "vite.config.ts"
-  ]
+    "vite.config.ts",
+    "tests"
+  ],
+  "exclude": ["src/web"]
 }

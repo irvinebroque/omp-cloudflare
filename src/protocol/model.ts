@@ -1,17 +1,9 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 
-export const jsonValue = z.json();
+import { jsonValue, objectSchema, type Json, type JsonInput } from "./json.ts";
 
-export type Json = z.infer<typeof jsonValue>;
-
-export type JsonInput =
-  | Json
-  | undefined
-  | { readonly [key: string]: JsonInput }
-  | readonly JsonInput[];
-
-export const objectSchema = z.record(z.string(), jsonValue);
+export { jsonValue, objectSchema, type Json, type JsonInput } from "./json.ts";
 
 export const timestampSchema = z
   .string()
@@ -25,7 +17,7 @@ const label = z
   .max(256)
   .refine((value) => value.trim().length > 0);
 
-/** OMP editors' draft v0.2 minimal profile; arbitrary JSON extensions survive parsing. */
+/** OMP editors' draft v0.5 minimal profile; arbitrary JSON extensions survive parsing. */
 export const memorySchema = z
   .object({
     identifier: label,
@@ -33,18 +25,23 @@ export const memorySchema = z
       .string()
       .min(1)
       .max(128)
-      .refine((value) => value.trim().length > 0),
+      .regex(
+        /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+(?:\s*;\s*[a-z0-9!#$&^_.+-]+=(?:[a-z0-9!#$&^_.+-]+|"[^"\r\n]*"))*$/iu,
+        "Invalid MIME type",
+      ),
     created_at: timestampSchema,
     body: z
       .string()
       .refine((value) => new TextEncoder().encode(value).length <= 16384, "body exceeds 16 KiB"),
+    protocol_version: z.string().min(1).max(64).optional(),
+    weight: z.number().finite().optional(),
     title: label.optional(),
     tags: z.array(z.string().max(128)).max(32).optional(),
     valid_from: timestampSchema.optional(),
     valid_until: timestampSchema.optional(),
     x_omp_origin: label.optional(),
   })
-  .catchall(jsonValue)
+  .catchall(jsonValue.optional())
   .refine(
     (memory) =>
       memory.valid_from === undefined ||
@@ -76,7 +73,7 @@ export const EXPORT_TOMBSTONE_PAGE_SIZE = 50;
 
 export const archiveSchema = z.object({
   manifest: z.object({
-    protocol_version: z.literal("0.2"),
+    protocol_version: z.enum(["0.2", "0.5"]),
     profiles: z.tuple([z.literal("minimal")]),
     origin: label,
     exported_at: timestampSchema,
@@ -149,7 +146,7 @@ export function validateMemory(value: JsonInput): Memory {
 
 export interface Identity {
   identifier: string;
-  x_omp_origin?: string;
+  x_omp_origin?: string | undefined;
 }
 
 export function key(memory: Identity, fallback: string) {
@@ -238,10 +235,35 @@ export function merge(
   return receipts;
 }
 
+const edgeSchema = z.array(z.object({ target: z.string() }).catchall(jsonValue));
+
+/** Only the proposed typed-edge target is interpreted; unknown edge shapes remain opaque. */
+function relink(memory: Memory, resolve: (target: string) => string): Memory {
+  const edges = edgeSchema.safeParse(memory.links);
+
+  if (!edges.success) return memory;
+
+  return {
+    ...memory,
+    links: edges.data.map((edge) => {
+      edge.target = resolve(edge.target);
+
+      return edge;
+    }),
+  };
+}
+
 export function archive(state: State): Archive {
+  const counts = new Map<string, number>();
+
+  for (const memory of state.memories)
+    counts.set(memory.identifier, (counts.get(memory.identifier) ?? 0) + 1);
+
   const mapping = state.memories.map((memory) => ({
     exported_identifier:
-      "omp-" + createHash("sha256").update(key(memory, state.origin)).digest("hex"),
+      counts.get(memory.identifier) === 1
+        ? memory.identifier
+        : "omp-" + createHash("sha256").update(key(memory, state.origin)).digest("hex"),
     origin: memory.x_omp_origin ?? state.origin,
     identifier: memory.identifier,
   }));
@@ -258,7 +280,7 @@ export function archive(state: State): Archive {
 
   return {
     manifest: {
-      protocol_version: "0.2",
+      protocol_version: "0.5",
       profiles: ["minimal"],
       origin: state.origin,
       exported_at: new Date().toISOString(),
@@ -268,7 +290,13 @@ export function archive(state: State): Archive {
       x_omp_identity_map: mapping,
     },
     memories: state.memories.map((memory) => ({
-      ...memory,
+      ...relink(
+        memory,
+        (target) =>
+          identities.get(
+            key({ identifier: target, x_omp_origin: memory.x_omp_origin }, state.origin),
+          ) ?? target,
+      ),
       identifier: text(identities.get(key(memory, state.origin)), "exported identifier"),
     })),
     tombstones: state.tombstones,
@@ -313,6 +341,10 @@ export function importedMemories(snapshot: Archive): Memory[] {
     )
       throw new ApiError(400, "Inconsistent export identity mapping");
 
-    return { ...memory, identifier: identity.identifier, x_omp_origin: identity.origin };
+    return {
+      ...relink(memory, (target) => byExport.get(target)?.identifier ?? target),
+      identifier: identity.identifier,
+      x_omp_origin: identity.origin,
+    };
   });
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type JsonInput, jsonValue } from "../src/model.ts";
+import { type JsonInput, jsonValue } from "../src/protocol/model.ts";
 import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
@@ -31,7 +31,7 @@ const searchSchema = z.object({
 const aboutSchema = z.object({ storage: z.string() });
 const statusSchema = z.object({ status: z.number() });
 
-const base = (process.argv[2] ?? "https://ompi-memory.roundtrip.workers.dev").replace(/\/$/, "");
+const base = (process.argv[2] ?? "http://localhost:5173").replace(/\/$/, "");
 const client = new Client({ name: "omp-roundtrip", version: "0.1.0" });
 const prefix = "mcp-check-" + crypto.randomUUID();
 const repository = "https://github.com/omp-example/" + prefix;
@@ -76,7 +76,11 @@ async function add(store: string, suffix: string, extra: Record<string, JsonInpu
 }
 
 try {
-  await client.connect(new StreamableHTTPClientTransport(new URL(base + "/mcp")));
+  await client.connect(
+    new StreamableHTTPClientTransport(new URL(base + "/mcp"), {
+      requestInit: { headers: { authorization: "Bearer " + (process.env.OMP_API_TOKEN ?? "") } },
+    }),
+  );
   const tools = await client.listTools();
   assert.deepEqual(tools.tools.map((t) => t.name).toSorted(), [
     "about_omp",

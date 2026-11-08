@@ -1,10 +1,10 @@
 import type { z } from "zod";
-import { ApiError, objectSchema, type JsonInput, type Memory } from "./model.ts";
-import { read, STORES, type Store } from "./storage.ts";
-import type { gatewaySearchResponse } from "./contracts.ts";
-import { storeSchema } from "./contracts.ts";
-import { pageInput, paginate } from "./pagination.ts";
-import { applicable, validateContext } from "./runtime.ts";
+import { ApiError, objectSchema, type JsonInput, type Memory } from "../protocol/model.ts";
+import { read, STORES, type Store } from "../storage/artifacts.ts";
+import type { gatewaySearchResponse } from "../protocol/contracts.ts";
+import { storeSchema } from "../protocol/contracts.ts";
+import { pageInput, paginate } from "../protocol/pagination.ts";
+import { applicable, validateContext } from "../protocol/runtime.ts";
 
 export type GatewayHit = z.infer<typeof gatewaySearchResponse>["memories"][number];
 

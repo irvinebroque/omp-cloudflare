@@ -1,192 +1,198 @@
-# OMP on Cloudflare — working prototype
+# OMP on Cloudflare
 
-A TypeScript implementation inside the OMPI fork. It follows the **minimal memory object / exchange profile** of the [October 14 editors' draft (PR #13)](https://github.com/The-AI-Disclosures-Project/Open-Memory-Protocol/pull/13) and implements concrete HTTP payloads for the FMP endpoint proposal. Neither upstream proposal is an adopted standard. This is an experimental implementation, not an official OMP SDK.
+A working memory service you can run in your own Cloudflare account. Save personal or company context, recall it over HTTP or MCP, and move it between stores without losing extension metadata. Each change becomes a Git commit in Cloudflare Artifacts.
 
-Live demo: https://ompi-memory.roundtrip.workers.dev
+[![Verify](https://github.com/irvinebroque/omp-cloudflare/actions/workflows/ci.yml/badge.svg)](https://github.com/irvinebroque/omp-cloudflare/actions/workflows/ci.yml)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/irvinebroque/omp-cloudflare)
 
-**Use it with Codex:** [installation and examples](codex/README.md). The deployed `/mcp` endpoint exposes six tools for recall, explicit personal/company writes, guarded revisions, and deletion. Run `npm run codex:setup` to register the server and install the checked-in memory skill.
-
-## Architecture
+This is an independently maintained **community implementation example** of the [Open Memory Protocol editors’ draft v0.5](https://github.com/The-AI-Disclosures-Project/Open-Memory-Protocol/blob/main/working-group/exchange-and-runtime/2026-11-06-working-spec-v0.5.md). The HTTP routes, MCP tools, archive envelope, and runtime conventions here are experimental. The OMP project has not designated this an official reference implementation. See [protocol coverage](docs/protocol.md).
 
 ```mermaid
 flowchart LR
-    Agent[Agent / TypeScript client / browser] --> Gateway[Memory gateway — Cloudflare Worker]
-    Gateway --> Personal[Personal memory store]
-    Gateway --> Company[Company memory store]
-    Personal --> PA[Cloudflare Artifact: personal Git repository]
-    Company --> CA[Cloudflare Artifact: company Git repository]
+  UI[Browser demo] --> API[Cloudflare Worker]
+  SDK[TypeScript SDK] --> API
+  Agent[MCP client / Codex] --> MCP[Six MCP tools]
+  MCP --> API
+  API --> Auth[Operator token]
+  Auth --> Gateway[Personal / company routing]
+  Gateway --> Personal[Artifacts: personal Git repo]
+  Gateway --> Company[Artifacts: company Git repo]
+  Personal <-->|OMP JSON snapshot| Folder[Independent Python folder adapter]
 ```
 
-**Every memory is durably stored in Cloudflare Artifacts**, in `omp-state.json` in a Git repository. `MEMORY.md` is a lightweight index. These are actual Cloudflare Artifacts, not process-local state, KV, D1, R2, or GitHub storage. `memfs` is only an ephemeral Git working tree used while committing; success is returned after the push succeeds. Reads fetch a specific commit through the Artifacts binding.
+## Run locally
 
-The connected repositories in namespace `ompi-memory-prototype` are:
-
-- `personal`: personal preferences and context.
-- `company`: company knowledge and decisions.
-
-The gateway searches both in parallel and returns the source store for each result. If a store fails, it reports `partial: true` and per-store failures; if both fail, it returns 503. Writes carry `store: "personal" | "company"`. Omitted targets default to personal; an unknown target is rejected. The server does not guess that personal information belongs to a company. Stores are separate repositories, but **there is no access isolation** in this public prototype.
-
-Runtime: Cloudflare Workers. Storage and revision history: Cloudflare Artifacts. No external runtime services or database. GitHub hosts implementation source only.
-
-## Run and deploy
-
-Requirements: Node.js 24.22.x or a compatible later 24.x release, or Node.js 26.12+, and a `cf` login authorized for Workers and Artifacts. `.node-version` selects 24.22.0; the lockfile pins CLI and build dependencies.
+You need Node **24.22+** within the 24.x line (or 26.12+ within 26.x), npm, and Python 3.10+ for the independent exchange test. Local development needs no Cloudflare login or paid plan.
 
 ```sh
-cd prototypes/cloudflare-memory
+git clone https://github.com/irvinebroque/omp-cloudflare.git
+cd omp-cloudflare
 npm ci
-cf auth whoami
-npm run check
+npm run dev
+```
+
+Open **http://localhost:5173** and select **Connect**. The development token is filled in automatically. Write a memory, search for it, open it to edit, or export a snapshot. Switch to the other store and import the file to see portability in action.
+
+The Artifacts binding runs in a **local simulator**, persists under `.cloudflare/state`, and initializes its repositories on first use. Local development never binds to your deployed Artifacts namespace. Removing `.cloudflare/state` resets local data after you stop the server.
+
+Try the API:
+
+```sh
+export OMP_API_TOKEN=local-development-token-only
+export OMP_URL=http://localhost:5173
+
+curl "$OMP_URL/gateway/fmp/upload/inferences" \
+  -H "Authorization: Bearer $OMP_API_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"store":"personal","memory":{"identifier":"answer-style","body":"Prefer concise answers with working code.","media_type":"text/markdown","protocol_version":"0.5"}}'
+
+curl "$OMP_URL/gateway/fmp/search" \
+  -H "Authorization: Bearer $OMP_API_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"concise"}'
+```
+
+## Deploy to your Cloudflare account
+
+Deployment requires [Workers Paid and Artifacts access](https://developers.cloudflare.com/artifacts/get-started/). Review [Artifacts pricing](https://developers.cloudflare.com/artifacts/platform/pricing/). The service uses one private operator token; `personal` and `company` are separate stores under that operator, not separate tenants.
+
+### Deploy button
+
+Click **Deploy to Cloudflare** above. Cloudflare copies this template into your GitHub account and configures Workers Builds.
+
+1. Select your Cloudflare account and repository name.
+2. Generate a private token with `openssl rand -hex 32`. Enter it as **MEMORY_API_TOKEN** when prompted. Keep the value for your browser and clients.
+3. Keep the detected build command, `npm run build`, and deploy command, `npm run deploy`. Use Node 24.22+ in build settings.
+4. Ensure the build’s Cloudflare API token can edit **Workers Scripts** and **Artifacts** in the selected account. The deploy script inspects or creates the `omp-cloudflare` namespace with `cf`, then deploys the Worker and its assets.
+5. Open the resulting Worker URL, enter your operator token, and select **Connect**. Both repositories initialize on first use.
+
+`wrangler.jsonc` supplies the metadata the button discovers. `cloudflare.config.ts` is the configuration used by `cf`. The build-provided `WORKERS_CI_WORKER_NAME` takes precedence over the default name, so you can rename your Worker in the deployment flow. Artifacts is not in the button’s [automatic resource list](https://developers.cloudflare.com/workers/platform/deploy-buttons/); provisioning is handled by our deploy script. See [deployment details and troubleshooting](docs/deployment.md).
+
+### Deploy with the Cloudflare CLI
+
+Use the checked-in `cf` version through npm scripts:
+
+```sh
+npx cf auth login
+# If you have multiple accounts, choose explicitly:
+export CLOUDFLARE_ACCOUNT_ID=your-account-id
+
+# Save this private value securely. Do not commit it.
+export MEMORY_API_TOKEN="$(openssl rand -hex 32)"
 npm run deploy
-npm run roundtrip -- https://ompi-memory.roundtrip.workers.dev
+
+# Use the URL printed by cf:
+export OMP_URL=https://your-worker.your-subdomain.workers.dev
+export OMP_API_TOKEN="$MEMORY_API_TOKEN"
+npm run roundtrip -- "$OMP_URL"
+npm run mcp:roundtrip -- "$OMP_URL"
 ```
 
-`cloudflare.config.ts` targets the **Roundtrip** account explicitly. To deploy elsewhere, change `accountId` and create the namespace and the two repositories in that account:
+To create another deployment, set **both** `OMP_WORKER_NAME` and `OMP_NAMESPACE` to new names. Reusing a namespace intentionally shares its stores. Secrets are uploaded from a temporary mode-0600 JSON file and removed after deployment. When no `MEMORY_API_TOKEN` environment variable is supplied, deployment preserves an existing Worker secret; a new Worker without a secret rejects protected operations.
 
-```sh
-cf artifacts namespaces create --namespace ompi-memory-prototype
-cf artifacts namespaces repos create ompi-memory-prototype --name personal --default-branch main
-cf artifacts namespaces repos create ompi-memory-prototype --name company --default-branch main
-cf deploy
-```
+## Use the TypeScript SDK
 
-Repository creation outputs an initial Git token: keep it private. Runtime requests mint short-lived repo-scoped tokens through the binding and revoke them in `finally`; no token is sent to API clients or stored in source. `npm run dev` uses the CLI's local Artifacts simulation; deploy/roundtrip verifies the real service.
-
-## Code quality
-
-[Vite+](https://viteplus.dev/guide/) 1.5.0 supplies the build toolchain, formatter,
-and type-aware Oxlint. `cf dev`, `cf build`, and `cf deploy` remain the
-Cloudflare entry points and delegate the Vite work to Vite+. No global Vite+
-installation is required after `npm ci`.
-
-```sh
-npm run check         # Generate binding types, check formatting, lint and types; deny warnings
-npm run lint          # Strict, type-aware lint and type checking
-npm run lint:fix      # Apply available lint fixes
-npm run format        # Format owned project files
-npm run build         # Cloudflare production build through Vite+
-```
-
-`vite.config.ts` enables correctness, suspicious, and performance rules as errors,
-plus explicit rules against unsafe values/assertions, implicit truthiness, floating
-promises, and non-exhaustive switches. TypeScript uses `strict`, checked indexed
-access, unused-local/parameter checks, and override/fallthrough checks. All 18 generic
-[anti-slop](https://github.com/dmmulroy/anti-slop) rules and its native accumulating-spread
-companion are errors. There are no rule suppressions in application code. Runtime
-schemas validate memory JSON, stored snapshots, SDK/MCP responses, and Codex CLI
-messages; arbitrary JSON extension fields remain portable.
-
-Anti-slop is vendored in `tools/oxlint/anti-slop`; its [provenance](tools/oxlint/anti-slop/UPSTREAM.md)
-records the source revision, licenses, and Vite+ import adaptation. Installed agent
-assets, generated outputs, and third-party rule code are excluded from lint/format.
-GitHub Actions runs check and build for changes to this demo.
-
-## TypeScript client
-
-The source client is `sdk/client.ts`. It uses standard `fetch` and exports the draft memory and archive types. Import it directly in TypeScript; it has not been published to npm.
+The SDK is source in this repository, not a published npm package. Run examples with `npx vpx` or use it from your checkout on supported Node.js.
 
 ```ts
 import { OmpClient, OmpGateway } from "./sdk/client.ts";
 
-const url = "https://ompi-memory.roundtrip.workers.dev";
-const gateway = new OmpGateway(url);
+const url = process.env.OMP_URL ?? "http://localhost:5173";
+const token = process.env.OMP_API_TOKEN ?? "local-development-token-only";
+const gateway = new OmpGateway(url, token);
+const personal = new OmpClient(url, "personal", token);
+const company = new OmpClient(url, "company", token);
 
-await gateway.remember(
-  {
-    identifier: "demo-preference", // Stable identity; read after an uncertain write before retrying.
-    body: "The user prefers concise answers.",
-    tags: ["preference"],
-  },
-  "personal",
+const saved = await gateway.remember({
+  identifier: crypto.randomUUID(),
+  body: "Use TypeScript for examples.",
+  custom_metadata: { preserve_me: true },
+});
+const current = await personal.read(saved.memory.identifier);
+await personal.update(
+  current.memory.identifier,
+  { body: "Use TypeScript with strict checks." },
+  current.memory.x_omp_origin,
+  current.version,
 );
 
-await gateway.remember(
-  {
-    identifier: "demo-company-process",
-    body: "Example company releases happen on Fridays.",
-    tags: ["decision"],
-  },
-  "company",
-);
-
-const hits = await gateway.search("Friday");
-// hits.memories: [{ store: 'company', memory: {...}, commit: '...' }]
-
-const personal = new OmpClient(url, "personal");
-const company = new OmpClient(url, "company");
-// Export is paginated: import every page, including tombstones.
-async function copyPage(cursor?: string): Promise<void> {
-  const snapshot = await personal.export(cursor);
-  const receipt = await company.import(snapshot);
-  console.log(receipt.receipts);
-  if (snapshot.next_cursor !== null) await copyPage(snapshot.next_cursor);
-}
-await copyPage();
-// Copy is explicit; this does not enable automatic sync.
+// snapshot() collects every tombstone page; importSnapshot() sends bounded requests.
+const snapshot = await personal.snapshot();
+const received = await company.importSnapshot(snapshot);
+console.log(received.receipts); // accepted, unchanged, or rejected for each memory
 ```
 
-## HTTP API
+Always inspect import receipts. Conflicting content at an existing identity is rejected; a repeated identical copy is unchanged. Imported memories retain their origin and are immutable here. To revise one, author a new local memory. Updates and deletes accept `if_version`; MCP requires it. On a 409, read again and reconcile.
 
-`GET /fmp/info` advertises prototype capabilities and limitations. `GET /gateway/info` describes connected stores and routing.
+## Connect an MCP client or Codex
 
-| Method | Gateway endpoint                 | JSON body                                                                                                                    |
-| ------ | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/gateway/fmp/search`            | `{ "query": "TypeScript", "limit": 20 }` — searches both stores                                                              |
-| POST   | `/gateway/fmp/upload/inferences` | `{ "store": "personal", "memory": { "identifier": "note-1", "body": "Use TypeScript" } }`                                    |
-| POST   | `/gateway/fmp/read`              | `{ "store": "company", "identifier": "note-1", "origin": "optional-origin" }`                                                |
-| POST   | `/gateway/fmp/update`            | `{ "store": "personal", "identifier": "note-1", "if_version": "optional-token-from-read", "patch": { "body": "Use Rust" } }` |
-| POST   | `/gateway/fmp/delete`            | `{ "store": "personal", "identifier": "note-1" }`                                                                            |
-| POST   | `/gateway/fmp/import`            | An exported archive plus `"store": "company"`                                                                                |
+The MCP endpoint is **`<your-worker-url>/mcp`**, using Streamable HTTP and `Authorization: Bearer <your-token>`.
 
-Every store also exposes these endpoints directly at `/stores/{personal|company}/fmp/...` without the `store` field. Additional store endpoints:
+| Tool              | Purpose                                                      |
+| ----------------- | ------------------------------------------------------------ |
+| `about_omp`       | Discover capabilities, limits, and experimental conventions  |
+| `search_memories` | Search applicable summaries across both stores               |
+| `get_memory`      | Retrieve the complete memory, provenance, and version        |
+| `add_memory`      | Create a memory in an explicit store                         |
+| `update_memory`   | Revise local content using the version just read             |
+| `delete_memory`   | Remove current content and write a replay-blocking tombstone |
 
-| Method | Endpoint                             | Meaning                                               |
-| ------ | ------------------------------------ | ----------------------------------------------------- |
-| GET    | `/stores/:store/fmp/read_inferences` | Export snapshot, manifest, tombstones, storage commit |
-| GET    | `/stores/:store/history`             | Latest 20 Artifacts Git commits                       |
-| GET    | `/stores/:store/fmp/info`            | Store capabilities                                    |
+For Codex, export `OMP_API_TOKEN` in the environment that starts Codex, then:
 
-`upload/inferences` supplies UUID identifier, `text/plain` media type, and current timestamp if absent. Imported memories must contain the draft's required fields (`identifier`, `media_type`, `created_at`, `body`). The body is text, including when its media type is JSON. Unknown fields survive storage and export/import. `read` retrieves by identifier with optional origin; ambiguous identifiers require origin. Search uses a case-insensitive substring over identifier, body, title, and tags, filtering future and expired memories. It is not semantic/vector search.
-
-Example write response:
-
-```json
-{
-  "routed_to": "personal",
-  "memory": {
-    "identifier": "note-1",
-    "media_type": "text/plain",
-    "created_at": "2026-11-06T12:00:00Z",
-    "body": "Use TypeScript",
-    "x_omp_origin": "cloudflare-artifacts:ompi-memory-prototype/personal"
-  },
-  "receipts": [
-    {
-      "identifier": "note-1",
-      "origin": "cloudflare-artifacts:ompi-memory-prototype/personal",
-      "status": "accepted"
-    }
-  ],
-  "commit": "<40-character Git commit hash>"
-}
+```sh
+npm run codex:setup -- "$OMP_URL/mcp"
+# Start a fresh Codex session and ask:
+# Use $omp-memory to remember that I prefer concise TypeScript examples.
+# In another fresh session:
+# Use $omp-memory to recall my response preferences.
 ```
 
-The `x_omp_origin` extension preserves `(origin, identifier)` across multi-hop copies. Repeated imports return `unchanged` without duplicates. Different content with the same identity is `rejected` in the per-object receipt; imports never silently overwrite it. Local memories may be changed through `update`; imported memories are immutable here. Export/import supports the minimal profile and snapshot/copy only. Unknown profiles and move intents are rejected.
+Setup adds one MCP entry and links this checkout’s memory skill under `~/.agents/skills/omp-memory`. Keep the checkout in place. It refuses to replace an existing entry with another URL or an unrelated skill. See [Codex setup, manual config, and verification](codex/README.md).
 
-Deletion removes a memory from the current view and exports and records a content-free tombstone. Tombstones block stale imports of that identity and propagate to another store when its snapshot is explicitly imported. **Git history retains old content: deletion is not secure erasure, forget, or automatic revocation of other copies.** No audit-profile conformance is claimed.
+## See an independent receiver
 
-Concurrent writes use Git fast-forward checks: a rejected push re-clones the current branch and reapplies the operation, up to four attempts. No force pushes. Reads return a per-memory `version` token; passing it as `if_version` to update/delete rejects stale edits with 409. MCP requires this guard, while existing REST callers may opt in. A storage failure returns 503; after an uncertain create, search/read before retrying because generated timestamps/identifiers do not guarantee idempotency. Request bodies are capped at 1 MiB, each memory body at 16 KiB, and each store at 100 active memories / 512 KiB of active memory JSON. The deletion ledger has no fixed entry cap and is retained to prevent stale-copy resurrection; it and Git history still consume Artifact storage and processing time. Git history continues growing. This is a small demo, not a high-throughput memory database.
+The [Python folder adapter](examples/file-store.py) uses only the standard library. It reads the minimal fields, writes each exported memory into its own JSON file, and preserves the remaining envelope and metadata without importing this implementation’s TypeScript or interpreting its private identity map.
 
-## Verification
+```sh
+curl "$OMP_URL/stores/personal/fmp/read_inferences" \
+  -H "Authorization: Bearer $OMP_API_TOKEN" > snapshot.json
+python3 examples/file-store.py import snapshot.json memory-folder
+python3 examples/file-store.py export memory-folder returned.json
+```
 
-`npm run roundtrip -- URL` exercises the deployed gateway and both stores, cross-store copy and copy-back, unknown field preservation, repeated imports, local update, concurrent writes, deletion/replay, invalid input, and actual Git history. It removes its sample memories from current views afterward; their Git history and tombstones remain.
+The curl example fetches one page. For stores with more than 50 tombstones, use `OmpClient.snapshot()` to collect the full snapshot. The adapter refuses to overwrite an existing folder. [Exchange behavior and collision handling](docs/protocol.md) explain the boundary this demonstrates.
 
-## Prototype boundaries
+## Develop and verify
 
-No authentication, authorization, scope policy, tenant separation, semantic search, transcript/file ingestion, automatic consolidation, secure forget, or full audit compliance. Runtime applicability/activation filtering is an experimental convention, not access control. Anyone who knows the demo URL can read and write both stores. Use sample data. The account and deployment names are intentionally committed; credentials are not.
+This project uses **Vite+ 1.5** for Vite/Rolldown builds, Vitest, Oxfmt, Oxlint, type-aware linting, and script execution. `cf dev` and `cf build` delegate to Vite+. Configuration lives in `vite.config.ts`.
 
-Search accepts an optional `cursor` and returns `next_cursor` (null on the last page). Keep query, context, and store selection unchanged while paging. Results rank always-active memories first, then creation time and identity. Cursors freeze the validity-filter time and bind store commits; a changed store or query/context returns 409, so restart without a cursor. Partial federation remains explicit in `partial` and per-store status.
+```sh
+npm run verify       # strict checks + unit tests + production build + isolated local E2E
+npm run test:quality # verifies the registered anti-slop plugin accepts/rejects fixtures
+npm run format       # Oxfmt
+npm run check        # formatting, Oxlint, and strict TypeScript; warnings fail
+```
 
-Exports contain unique deterministic IDs, plus `manifest.x_omp_identity_map` mapping those IDs to original `(origin, identifier)` pairs. Our importer restores those identities; receivers that ignore extensions still receive unambiguous IDs within the export. Preserve the map when copying or selecting records. `GET /stores/{store}/fmp/read_inferences?cursor=...` pages the retained tombstones (50 per page); memories appear on the first page only. Import every page and restart the export on 409 if the source changes. The demo UI downloads all pages as JSONL (one archive per line), and its copy action imports every page. This is an experimental extension, not a standardized OMP runtime or deletion protocol. Deletion-ledger processing remains linear in retained history, so large deployments need a different storage index.
+All generic rules from [Dillon Mulroy’s anti-slop](https://github.com/dmmulroy/anti-slop) are enabled as errors, alongside unsafe-assignment/call/return checks, strict booleans, promise checks, and exhaustive switches. Its [installation/update skill](.agents/skills/install-anti-slop/SKILL.md) is checked in at the same pinned revision as the vendored rules. [Provenance and the Vite+ import adaptation](tools/oxlint/anti-slop/UPSTREAM.md) record the only local vendor change. No lint suppressions or application type assertions are needed.
 
-MCP reads preserve full memory metadata. Updating a record whose imported `provenance` is not an array returns 409 rather than silently erasing that evidence. Write-token cleanup failures are logged separately; the five-minute token TTL still applies and the original operation result is preserved.
+The E2E suite starts fresh local simulators, restarts a server to prove persistence, tests an independent deployment’s origin, exchanges through Python, and exercises HTTP/MCP concurrency, import replay, pagination, and stale-version rejection. GitHub Actions runs the same suite without Cloudflare credentials. [Validation record](docs/validation.md) separates local, live, browser, and model checks.
+
+```text
+src/protocol/    Memory validation, exchange, pagination, and local runtime conventions
+src/storage/     Artifacts repositories, Git commits, optimistic retries, token cleanup
+src/server/      HTTP routes, gateway, bearer authentication, MCP tools
+src/web/         Vite-built browser demo with its own DOM TypeScript configuration
+sdk/             Validated TypeScript HTTP clients
+examples/        Independent Python snapshot receiver/exporter
+scripts/         Deploy, setup, and end-to-end verification
+codex/           Optional MCP configuration and memory skill
+tests/           Unit and integration test contracts
+```
+
+## Boundaries
+
+This is a small, inspectable example: 100 active memories and 512 KiB of active JSON per store, 16 KiB per body, and 1 MiB per API request. Search is substring matching. Bodies are UTF-8 strings with valid MIME labels; binary transport is unsupported. Git history and tombstones grow over time.
+
+The operator token controls all memory routes, including MCP and history. Discovery and static UI assets are public. Repository applicability controls retrieval, not authorization. Provenance is self-declared. Deleted content remains in Git history; this does not implement secure forgetting, multi-user authorization, autonomous memory hooks, vector search, realtime sync, move semantics, or full OMP profile conformance.
+
+Apache-2.0. Extracted from the original Cloudflare prototype with its Git history preserved. [Maintenance and possible OMP adoption](docs/ownership.md).

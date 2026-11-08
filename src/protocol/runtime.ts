@@ -160,7 +160,7 @@ export const memoryVersion = (memory: Memory) =>
 
 export interface MemorySelection {
   identifier: string;
-  origin?: string;
+  origin?: string | undefined;
 }
 
 export function selectMemory(state: State, data: MemorySelection): Memory {

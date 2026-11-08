@@ -68,5 +68,18 @@ export default defineConfig({
     },
     options: { typeAware: true, typeCheck: true },
   },
-  plugins: lazyPlugins(() => [cloudflare()]),
+  test: { include: ["tests/**/*.test.ts"] },
+  server: { port: Number(process.env.OMP_PORT ?? "5173"), strictPort: true },
+  plugins:
+    lazyPlugins(() =>
+      process.env.VITEST === "true"
+        ? []
+        : [
+            cloudflare({
+              inspectorPort: false,
+              persistState: { path: process.env.OMP_STATE_DIR ?? ".cloudflare/state" },
+              remoteBindings: false,
+            }),
+          ],
+    ) ?? [],
 });

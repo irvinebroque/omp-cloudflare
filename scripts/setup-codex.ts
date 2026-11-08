@@ -12,7 +12,7 @@ const urlArg = args.find((a) => !a.startsWith("--"));
 if (args.some((a) => a.startsWith("--") && a !== "--uninstall"))
   throw new Error("Usage: npm run codex:setup -- [https://worker/mcp] [--uninstall]");
 
-const endpoint = new URL(urlArg ?? "https://ompi-memory.roundtrip.workers.dev/mcp");
+const endpoint = new URL(urlArg ?? "http://localhost:5173/mcp");
 
 if (
   endpoint.protocol !== "https:" &&
@@ -97,7 +97,15 @@ if (uninstall) {
     throw new Error("Endpoint is not the expected OMP MCP deployment");
 
   if (existing === undefined) {
-    const added = cli("mcp", "add", name, "--url", endpoint.href);
+    const added = cli(
+      "mcp",
+      "add",
+      name,
+      "--url",
+      endpoint.href,
+      "--bearer-token-env-var",
+      "OMP_API_TOKEN",
+    );
 
     if (added.status !== 0) throw new Error(added.stderr || "Could not register MCP server");
   }
@@ -108,6 +116,6 @@ if (uninstall) {
   }
 
   console.log(
-    `Registered ${name}: ${endpoint.href}\nInstalled skill: ${destination}\nOpen a fresh Codex session and try: Use $omp-memory to recall my preferences and company context.\nFor a different deployment, update the URL in the skill’s agents/openai.yaml as well.`,
+    `Registered ${name}: ${endpoint.href}\nInstalled skill: ${destination}\nOpen a fresh Codex session and try: Use $omp-memory to recall my preferences and company context.\nExport OMP_API_TOKEN before starting Codex. The skill uses the endpoint registered above.`,
   );
 }
