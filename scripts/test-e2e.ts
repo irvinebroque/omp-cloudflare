@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as pause } from "node:timers/promises";
@@ -138,24 +138,6 @@ try {
 
   const origin = saved.memory.x_omp_origin;
   const snapshot = await client.export();
-  const archiveFile = join(temporary, "snapshot.json");
-  await writeFile(archiveFile, JSON.stringify(snapshot));
-  await run("python3", [
-    "examples/file-store.py",
-    "import",
-    archiveFile,
-    join(temporary, "folder"),
-  ]);
-  await run("python3", [
-    "examples/file-store.py",
-    "export",
-    join(temporary, "folder"),
-    join(temporary, "returned.json"),
-  ]);
-  assert.deepEqual(
-    JSON.parse(await readFile(join(temporary, "returned.json"), "utf8")),
-    JSON.parse(JSON.stringify(snapshot)),
-  );
   await stop();
   await start(join(temporary, "first"));
   assert.deepEqual((await client.read("restart-canary")).memory, saved.memory);
@@ -187,7 +169,7 @@ try {
   );
   console.log("PASS bounded request validation and full SDK multi-page snapshots");
   console.log(
-    "PASS authentication, public UI, process restart, separate origins, independent Python file-store exchange, HTTP, MCP, concurrency and regression suites",
+    "PASS authentication, public UI, process restart, separate origins, HTTP, MCP, concurrency and regression suites",
   );
 } finally {
   await stop();

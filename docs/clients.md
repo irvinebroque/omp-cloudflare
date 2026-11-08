@@ -77,16 +77,3 @@ The MCP endpoint is **`<your-worker-url>/mcp`**, using Streamable HTTP and `Auth
 | `delete_memory`   | Remove current content and write a replay-blocking tombstone |
 
 For Codex, follow the [setup guide](../codex/README.md).
-
-## Exchange with a Python folder
-
-The [Python folder adapter](../examples/file-store.py) uses only the standard library. It reads the minimal fields, writes each exported memory into its own JSON file, and preserves the remaining envelope and metadata without importing this implementation’s TypeScript or interpreting its private identity map.
-
-```sh
-curl "$OMP_URL/stores/personal/fmp/read_inferences" \
-  -H "Authorization: Bearer $OMP_API_TOKEN" > snapshot.json
-python3 examples/file-store.py import snapshot.json memory-folder
-python3 examples/file-store.py export memory-folder returned.json
-```
-
-The curl example fetches one page. For stores with more than 50 tombstones, use `OmpClient.snapshot()` to collect the full snapshot. The adapter refuses to overwrite an existing folder. [Exchange behavior and collision handling](protocol.md) explain the boundary this demonstrates.

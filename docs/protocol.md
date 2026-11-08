@@ -23,17 +23,14 @@ Ordinarily, export keeps the original identifier. If two origins contain the sam
 
 Proposed typed metadata links shaped like `links: [{target, ...}]` are rewritten to exported identifiers within the source origin; import restores the targets when the identity map is present. Unknown edge shapes and external references are left untouched. Inline body references are opaque text and are not rewritten: if you rely on inline IDs, use identifiers unique across origins before combining stores. This limitation matters in the collision case.
 
-A generic receiver can use the unique exported IDs and typed links without understanding our identity map. The independent Python folder example demonstrates that boundary and preserves the identity extension as opaque JSON. It is deliberately a file adapter, not a second complete OMP implementation.
+A generic receiver can use the unique exported IDs and typed links without understanding our identity map, preserving that extension as opaque JSON.
 
 ```mermaid
 sequenceDiagram
   participant A as Original store
-  participant F as Python folder adapter
   participant B as Other store
   A->>A: Validate memory + preserve extensions
-  A->>F: JSON snapshot with unique exported IDs
-  F->>F: Store each memory as JSON
-  F->>B: Export unchanged metadata and envelope
+  A->>B: JSON snapshot with unique exported IDs
   B->>B: Validate, restore identity map, merge
   B-->>A: Per-memory receipts; origin retained
 ```

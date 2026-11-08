@@ -1,6 +1,6 @@
 # Contributing
 
-Use [Node 24.22.0](.node-version) and Python 3.10+.
+Use [Node 24.22.0](.node-version).
 
 ```sh
 npm ci
@@ -16,7 +16,7 @@ npm run verify
 npm run test:quality
 ```
 
-`verify` runs strict checks, 21 unit tests, production builds, and the isolated HTTP/MCP/Python/concurrency/exchange suite. It needs no Cloudflare credentials. [Validation details](docs/validation.md).
+`verify` runs strict checks, 21 unit tests, production builds, and the isolated HTTP/MCP/concurrency/exchange suite. It needs no Cloudflare credentials. [Validation details](docs/validation.md).
 
 Include regression evidence when changing persistence, exchange, pagination, authentication, or concurrency. Tests use the real local simulator and MCP clients; module mocks are prohibited by lint.
 
@@ -41,7 +41,6 @@ src/storage/     Artifacts storage and Git commits
 src/server/      HTTP, MCP, authentication, and routing
 src/web/         Browser chat UI
 sdk/             TypeScript clients
-examples/        Independent Python receiver/exporter
 scripts/         Deployment, setup, and verification
 codex/           MCP configuration and memory skill
 tests/           Unit tests

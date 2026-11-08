@@ -2,6 +2,12 @@
 
 This record describes the checks actually run for the Pi chat redesign and the initial standalone example. It is evidence for these versions and environments, not an OMP conformance certification or a claim that every Cloudflare account has the same plan and permissions.
 
+## Current suite
+
+The Python folder adapter and its CI setup have been removed. Export/import coverage uses the TypeScript clients, including preservation of metadata and origin identity, independent store origins, repeated imports, conflicts, and deletion markers. Python is no longer required. The Python-specific result in the agent release notes below describes validation before the adapter was removed.
+
+After removal, `npm run verify` and `npm run test:quality` passed: strict formatting/lint/types, 21 unit tests, production builds, and the complete remaining local E2E suite.
+
 ## Pi chat redesign
 
 ### Access key clarification
@@ -29,7 +35,7 @@ npm run test:quality
 npm audit --omit=dev
 ```
 
-The development environment used Node 24.22.0, npm 11.19.1, Vite+ 1.5.0, `cf` 1.0.0-beta.28, and Python 3. Local checks ran on macOS; [GitHub Actions](https://github.com/irvinebroque/omp-cloudflare/actions/workflows/ci.yml) repeats a clean install and the same checks on Ubuntu with Python 3.12. The lockfile pins the resolved dependencies.
+The development environment used Node 24.22.0, npm 11.19.1, Vite+ 1.5.0, `cf` 1.0.0-beta.28. Local checks ran on macOS; [GitHub Actions](https://github.com/irvinebroque/omp-cloudflare/actions/workflows/ci.yml) repeats a clean install and the same checks on Ubuntu. The lockfile pins the resolved dependencies.
 
 | Check                                                                                     | Result                                                                                                                                                  |
 | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -41,7 +47,6 @@ The development environment used Node 24.22.0, npm 11.19.1, Vite+ 1.5.0, `cf` 1.
 | Public assets / protected endpoints                                                       | UI and health are public; unauthenticated memory and MCP requests return 401                                                                            |
 | Invalid inputs                                                                            | Malformed JSON 400; wrong content type 415; over-1-MiB body 413                                                                                         |
 | Persistence and isolation                                                                 | Memory survives process restart; a fresh deployment has a distinct store origin                                                                         |
-| Independent exchange                                                                      | Standard-library Python receiver/exporter preserves the complete snapshot JSON without importing the TypeScript implementation                          |
 | HTTP scenarios                                                                            | 14 checks: write/read/search, routing, copies, receipts, conflicts, concurrency, tombstones, history, and invalid body                                  |
 | MCP scenarios                                                                             | 8 checks: initialize/discover, resources, six tools, context applicability, provenance, conditional writes/deletes, invalid arguments, concurrent edits |
 | Portability regressions                                                                   | 6 checks: opaque IDs and extension data, evidence, pagination, collision-safe exports, idempotence, and multi-page tombstone replay prevention          |
