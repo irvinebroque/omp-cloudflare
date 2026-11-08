@@ -11,6 +11,14 @@ import {
 import { applicable, memoryVersion, repositoryKey, relativePath } from "../src/protocol/runtime.ts";
 import { authorize } from "../src/server/auth.ts";
 
+it("fails closed for an absent secret or the former example placeholder", () => {
+  const request = new Request("https://example.invalid");
+  expect(() => authorize(request, undefined)).toThrow("Configure MEMORY_API_TOKEN");
+  expect(() =>
+    authorize(request, "replace-with-a-random-private-token-of-at-least-24-characters"),
+  ).toThrow("Configure MEMORY_API_TOKEN");
+});
+
 const memory = memorySchema.parse({
   identifier: "preferences",
   created_at: "2026-11-08T12:00:00Z",
