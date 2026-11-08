@@ -1,6 +1,6 @@
 # OMP on Cloudflare
 
-A working memory service you can run in your own Cloudflare account. Save personal or company context, recall it over HTTP or MCP, and move it between stores without losing extension metadata. Each change becomes a Git commit in Cloudflare Artifacts.
+A minimal chat agent with memory you can take with you. [Cloudflare’s Pi harness](https://developers.cloudflare.com/agents/harnesses/pi/) runs the conversation in a Durable Object, uses Workers AI, and saves reusable context through OMP in Cloudflare Artifacts. Start a fresh chat and the agent can recall what you asked it to remember. The same memories are available over HTTP, MCP, and portable JSON snapshots.
 
 [![Verify](https://github.com/irvinebroque/omp-cloudflare/actions/workflows/ci.yml/badge.svg)](https://github.com/irvinebroque/omp-cloudflare/actions/workflows/ci.yml)
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/irvinebroque/omp-cloudflare)
@@ -9,27 +9,30 @@ This is an independently maintained **community implementation example** of the 
 
 ```mermaid
 flowchart LR
-  UI[Browser demo] --> API[Cloudflare Worker]
+  UI[Minimal chat UI] --> Auth[Operator token]
+  Auth --> Pi[PiHarness in a SQLite Durable Object]
+  Pi --> AI[Workers AI]
+  Pi --> Tools[Search / read / remember tools]
+  Tools --> API[OMP routes]
   SDK[TypeScript SDK] --> API
   Agent[MCP client / Codex] --> MCP[Six MCP tools]
   MCP --> API
-  API --> Auth[Operator token]
-  Auth --> Gateway[Personal / company routing]
+  API --> Gateway[Personal / company routing]
   Gateway --> Personal[Artifacts: personal Git repo]
   Gateway --> Company[Artifacts: company Git repo]
   Personal <-->|OMP JSON snapshot| Folder[Independent Python folder adapter]
 ```
 
 <details>
-<summary>Browser demo: a memory copied into another store</summary>
+<summary>Browser demo: a conversation with portable memory</summary>
 
-![The deployed browser demo reading an imported memory with its original origin retained.](docs/images/demo.png)
+![The minimal Pi-powered chat demo.](docs/images/demo.png)
 
 </details>
 
 ## Run locally
 
-You need Node **24.22+** within the 24.x line (or 26.12+ within 26.x), npm, and Python 3.10+ for the independent exchange test. Local development needs no Cloudflare login or paid plan.
+You need Node **24.22+** within the 24.x line (or 26.12+ within 26.x), npm, and Python 3.10+ for the independent exchange test. Memory storage and the automated protocol suite run entirely locally without credentials. **Chat uses real Workers AI inference** and requires Cloudflare authentication; inference is billed to your account.
 
 ```sh
 git clone https://github.com/irvinebroque/omp-cloudflare.git
@@ -38,7 +41,23 @@ npm ci
 npm run dev
 ```
 
-Open **http://localhost:5173** and select **Connect**. The development token is filled in automatically. Write a memory, search for it, open it to edit, or export a snapshot. Switch to the other store and import the file to see portability in action.
+Open **http://localhost:5173**. **Connect** holds the operator token and store selector; the development token is filled in automatically. **Memories** shows saved facts and snapshot import/export. Without remote AI enabled, local chat is disabled while the memory APIs and transfer controls remain available.
+
+To use the local chat UI, stop the server, sign in, and opt in to Workers AI:
+
+```sh
+npx cf auth login
+# Select your account if you have more than one:
+export CLOUDFLARE_ACCOUNT_ID=your-account-id
+OMP_REMOTE_AI=true npm run dev
+```
+
+1. Connect, then ask: **“Remember that I prefer concise TypeScript examples.”**
+2. Select **New chat**.
+3. Ask: **“What response style do I prefer?”** The agent searches and reads the OMP store in the new conversation.
+4. Open **Memories**, export a snapshot, switch to the other store in **Connect**, and import it. A new chat in that store can retrieve the imported context.
+
+Chat history lives in Pi’s SQLite tables. Only facts explicitly saved with the `remember` tool become portable OMP memories. The browser polls Pi’s live view while a run is active, showing partial answers and tool receipts. Reloading keeps the conversation ID in tab session storage; the token must be entered again. [Agent architecture, API, privacy, and limits](docs/agent.md).
 
 The Artifacts binding runs in a **local simulator**, persists under `.cloudflare/state`, and initializes its repositories on first use. Local development never binds to your deployed Artifacts namespace. Removing `.cloudflare/state` resets local data after you stop the server.
 
@@ -70,7 +89,7 @@ Click **Deploy to Cloudflare** above. Cloudflare copies this template into your 
 1. Select your Cloudflare account and repository name.
 2. Generate a private token with `openssl rand -hex 32`. Enter it as **MEMORY_API_TOKEN** when prompted. Keep the value for your browser and clients.
 3. Keep the detected build command, `npm run build`, and deploy command, `npm run deploy`. Disable **Preview builds** for this example; its validated path is a production Worker. Use Node 24.22+ in build settings.
-4. Ensure the build’s Cloudflare API token can edit **Workers Scripts** and **Artifacts** in the selected account. The deploy script inspects or creates the namespace matching the copied project’s name with `cf`, then deploys the Worker and its assets.
+4. Ensure the build’s Cloudflare API token can edit **Workers Scripts** and **Artifacts** in the selected account. The deploy script inspects or creates the Artifacts namespace matching the copied project’s name with `cf`, then deploys the Worker, SQLite Durable Object, Workers AI binding, and assets. The build credentials must allow deploying the Durable Object and Workers AI bindings as well.
 5. Open the resulting Worker URL, enter your operator token, and select **Connect**. Both repositories initialize on first use.
 
 `wrangler.jsonc` supplies the metadata the button discovers. `cloudflare.config.ts` is the configuration used by `cf`. `cf` reads the project name and compatibility date from that metadata, including changes made by the deploy button. The default namespace follows the copied project’s name. Artifacts is not in the button’s [automatic resource list](https://developers.cloudflare.com/workers/platform/deploy-buttons/); provisioning is handled by our deploy script. See [deployment details and troubleshooting](docs/deployment.md).
@@ -185,6 +204,7 @@ All generic rules from [Dillon Mulroy’s anti-slop](https://github.com/dmmulroy
 The E2E suite starts fresh local simulators, restarts a server to prove persistence, tests an independent deployment’s origin, exchanges through Python, and exercises HTTP/MCP concurrency, import replay, pagination, and stale-version rejection. GitHub Actions runs the same suite without Cloudflare credentials. [Validation record](docs/validation.md) separates local, live, browser, and model checks.
 
 ```text
+src/agent/       Pi harness, replay-safe OMP tools, typed browser chat contract
 src/protocol/    Memory validation, exchange, pagination, and local runtime conventions
 src/storage/     Artifacts repositories, Git commits, optimistic retries, token cleanup
 src/server/      HTTP routes, gateway, bearer authentication, MCP tools
@@ -200,6 +220,6 @@ tests/           Unit and integration test contracts
 
 This is a small, inspectable example: 100 active memories and 512 KiB of active JSON per store, 16 KiB per body, and 1 MiB per API request. Search is substring matching. Bodies are UTF-8 strings with valid MIME labels; binary transport is unsupported. Git history and tombstones grow over time.
 
-The operator token controls all memory routes, including MCP and history. Discovery and static UI assets are public. Repository applicability controls retrieval, not authorization. Provenance is self-declared. Deleted content remains in Git history; this does not implement secure forgetting, multi-user authorization, autonomous memory hooks, vector search, realtime sync, move semantics, or full OMP profile conformance.
+The operator token controls all memory routes, including MCP and history. Discovery and static UI assets are public. Repository applicability controls retrieval, not authorization. Provenance is self-declared. Pi transcripts persist separately in Durable Objects and are not part of an OMP snapshot. New chat does not delete previous transcripts. Pi Durable is experimental and does not provide conversation deletion through this demo. Deleted memory content remains in Git history; this does not implement secure forgetting, multi-user authorization, autonomous memory hooks, vector search, realtime sync, move semantics, or full OMP profile conformance.
 
 Apache-2.0. Extracted from the original Cloudflare prototype with its Git history preserved. [Maintenance and possible OMP adoption](docs/ownership.md).

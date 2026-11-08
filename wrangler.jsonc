@@ -6,4 +6,9 @@
   "compatibility_date": "2026-11-08",
   "compatibility_flags": ["nodejs_compat"],
   "artifacts": [{ "binding": "ARTIFACTS", "namespace": "omp-cloudflare" }],
+  "ai": { "binding": "AI" },
+  "durable_objects": {
+    "bindings": [{ "name": "MemoryAgent", "class_name": "MemoryAgent" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MemoryAgent"] }],
 }

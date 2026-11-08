@@ -76,6 +76,32 @@ try {
   assert.equal((await fetch(base + "/stores/personal/fmp/read_inferences")).status, 401);
   assert.equal((await fetch(base + "/mcp")).status, 401);
 
+  const chat = base + "/api/chat/" + crypto.randomUUID();
+  assert.equal((await fetch(chat)).status, 401);
+  const chatHeaders = { authorization: "Bearer " + token, "content-type": "application/json" };
+  assert.equal((await fetch(base + "/api/chat/not-a-uuid", { headers: chatHeaders })).status, 400);
+  assert.equal((await fetch(chat + "?store=invalid", { headers: chatHeaders })).status, 400);
+  assert.equal((await fetch(chat, { method: "DELETE", headers: chatHeaders })).status, 405);
+  assert.equal(
+    (
+      await fetch(chat, {
+        method: "POST",
+        headers: chatHeaders,
+        body: JSON.stringify({ prompt: "", operationId: crypto.randomUUID() }),
+      })
+    ).status,
+    400,
+  );
+  const emptyChat = await fetch(chat, { headers: chatHeaders });
+  assert.equal(emptyChat.status, 200);
+  assert.deepEqual(await emptyChat.json(), {
+    messages: [],
+    streaming: "",
+    busy: false,
+    failure: null,
+    earlier: false,
+  });
+
   const headers = { authorization: "Bearer " + token, "content-type": "application/json" };
   assert.equal(
     (await fetch(base + "/stores/personal/fmp/import", { method: "POST", headers, body: "{" }))

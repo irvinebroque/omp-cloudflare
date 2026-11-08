@@ -3,120 +3,107 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f4f3ef" />
+    <meta name="theme-color" content="#faf9f6" />
     <link rel="stylesheet" href="/src/web/style.css" />
-    <title>OMP · Memory on Cloudflare</title>
+    <title>OMP · A little memory</title>
     <script type="module" src="/src/web/main.ts"></script>
   </head>
   <body>
-    <main>
-      <header>
-        <a class="wordmark" href="https://github.com/irvinebroque/omp-cloudflare"
-          >OMP / Cloudflare ↗</a
-        ><span class="badge">Community example · draft v0.5</span>
-      </header>
-      <section class="intro">
-        <p class="eyebrow">PORTABLE CONTEXT</p>
-        <h1>A memory you can take with you.</h1>
-        <p>
-          Write a memory, find it again, and move it to another store. Every change is a Git commit
-          in your Cloudflare account.
-        </p>
-      </section>
-      <section class="connection" aria-label="Connection">
-        <label
-          >Operator token<input
-            id="token"
-            type="password"
-            autocomplete="off"
-            placeholder="Enter your MEMORY_API_TOKEN"
-        /></label>
-        <label
-          >Store<select id="store">
-            <option value="personal">Personal</option>
-            <option value="company">Company</option>
-          </select></label
-        >
-        <button id="connect" type="button">Connect</button>
-        <p class="hint">
-          The token stays in this tab’s memory. Both stores share it. Deletion keeps Git history.
-        </p>
-      </section>
-      <section class="workspace">
-        <div class="panel">
-          <div class="panel-title">
-            <h2>Your memories</h2>
-            <button id="refresh" class="quiet" type="button">Refresh</button>
-          </div>
-          <form id="search-form">
-            <label for="query">Search this store</label>
-            <div class="inline">
-              <input id="query" type="search" placeholder="Keywords, or leave empty" /><button
-                type="submit"
-              >
-                Search
-              </button>
+    <header class="bar">
+      <a class="wordmark" href="https://github.com/irvinebroque/omp-cloudflare"
+        >omp<span> / a little memory</span></a
+      >
+      <nav aria-label="Chat controls">
+        <button id="new-chat" type="button">New chat</button>
+        <details id="memories-panel">
+          <summary>Memories<span id="memory-count"></span></summary>
+          <section class="popover" aria-label="Memories">
+            <div class="panel-heading">
+              <h2>Memories</h2>
+              <button id="refresh" type="button">Refresh</button>
             </div>
-          </form>
-          <p id="count" class="hint">Connect to load your memories.</p>
-          <ul id="results"></ul>
-          <button id="more" class="quiet" hidden type="button">Load more</button>
-        </div>
-        <div class="panel">
-          <div class="panel-title">
-            <h2 id="editor-title">New memory</h2>
-            <button id="new" class="quiet" type="button">New</button>
-          </div>
-          <form id="editor">
+            <ul id="memories"></ul>
+            <button id="more" type="button" hidden>Load more</button>
+            <div class="transfer">
+              <button id="export" type="button">Export</button
+              ><label class="file-button"
+                >Import<input id="import" type="file" accept="application/json,.json"
+              /></label>
+            </div>
+            <p class="hint">
+              Snapshots keep original identity and metadata. Deleted content remains in Git history.
+            </p>
+          </section>
+        </details>
+        <details id="connection">
+          <summary id="connection-label">Connect</summary>
+          <section class="popover connection" aria-label="Connection">
+            <h2>Connect your memory</h2>
             <label
-              >Title <span class="hint">optional</span
-              ><input id="title" maxlength="256" placeholder="Something worth remembering" /></label
-            ><label
-              >Body<textarea
-                id="body"
-                required
-                rows="8"
-                placeholder="The user prefers concise answers with working code examples."
-              ></textarea></label
-            ><label
-              >Format<select id="media">
-                <option value="text/markdown">Markdown</option>
-                <option value="text/plain">Plain text</option>
-                <option value="application/json">JSON</option>
+              >Operator token<input
+                id="token"
+                type="password"
+                autocomplete="off"
+                placeholder="MEMORY_API_TOKEN"
+            /></label>
+            <label
+              >Store<select id="store">
+                <option value="personal">Personal</option>
+                <option value="company">Company</option>
               </select></label
             >
-            <div class="actions">
-              <button id="save" type="submit">Save memory</button
-              ><button id="delete" class="danger quiet" hidden type="button">Delete</button>
-            </div>
-          </form>
-          <p id="reference" class="hint"></p>
+            <button id="connect" class="solid" type="button">Connect</button>
+            <p class="hint">
+              The token stays in this tab. Both stores share it. Chats persist in Durable Objects;
+              new chats keep your OMP memories.
+            </p>
+          </section>
+        </details>
+      </nav>
+    </header>
+    <main>
+      <section id="empty" class="empty">
+        <div class="seed" aria-hidden="true">✳</div>
+        <h1>What should I remember?</h1>
+        <p>A conversation that carries a little context.</p>
+        <div class="suggestions">
+          <button
+            type="button"
+            data-prompt="Remember that I prefer concise answers with TypeScript examples."
+          >
+            Remember a preference <span>↗</span></button
+          ><button type="button" data-prompt="What do you remember about me?">
+            Recall in a new chat <span>↗</span>
+          </button>
         </div>
       </section>
-      <section class="transfer">
-        <div>
-          <h2>Take your memories with you</h2>
-          <p>
-            Export a JSON snapshot, switch stores, then import it. Unknown metadata travels with
-            each memory.
-          </p>
-        </div>
-        <div class="actions">
-          <button id="export" class="quiet" type="button">Export snapshot</button
-          ><label class="file-button"
-            >Import snapshot<input id="import" type="file" accept="application/json,.json"
-          /></label>
-        </div>
-      </section>
-      <pre id="status" role="status" aria-live="polite">
-Ready. Start locally, or enter your deployment’s operator token.</pre>
-      <footer>
-        <a href="https://github.com/irvinebroque/omp-cloudflare#readme">Setup & documentation ↗</a
-        ><span
-          >Experimental HTTP + MCP binding. Single operator. Up to 100 active memories per
-          store.</span
-        >
-      </footer>
+      <section
+        id="messages"
+        class="messages"
+        aria-label="Conversation"
+        aria-live="polite"
+        aria-relevant="additions text"
+      ></section>
+      <div class="composer-wrap">
+        <p id="status" role="status" class="status">Connect to start a conversation.</p>
+        <form id="composer" class="composer">
+          <label class="sr-only" for="prompt">Message</label>
+          <textarea
+            id="prompt"
+            rows="2"
+            maxlength="8000"
+            placeholder="Ask something, or tell me what to remember…"
+            required
+          ></textarea>
+          <button id="send" class="solid" type="submit" aria-label="Send message" disabled>
+            ↑
+          </button>
+        </form>
+        <footer>
+          <span>Pi on Cloudflare · OMP memory</span
+          ><a href="https://github.com/irvinebroque/omp-cloudflare#readme">About this example ↗</a>
+        </footer>
+      </div>
     </main>
   </body>
 </html>

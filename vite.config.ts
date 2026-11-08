@@ -22,6 +22,9 @@ const ignored = [
 ];
 
 export default defineConfig({
+  define: {
+    "import.meta.env.VITE_OMP_REMOTE_AI": JSON.stringify(process.env.OMP_REMOTE_AI === "true"),
+  },
   environments: { ssr: { optimizeDeps: { exclude: ["async-lock"] } } },
   resolve: {
     alias: [
@@ -88,7 +91,7 @@ export default defineConfig({
             cloudflare({
               inspectorPort: false,
               persistState: { path: process.env.OMP_STATE_DIR ?? ".cloudflare/state" },
-              remoteBindings: false,
+              remoteBindings: process.env.OMP_REMOTE_AI === "true",
             }),
           ],
     ) ?? [],

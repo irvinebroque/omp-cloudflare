@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { JsonInput } from "../protocol/json.ts";
+import { chatView, type ChatView } from "../agent/contracts.ts";
 
 const json = z.json();
 
@@ -13,8 +14,6 @@ const memorySchema = z
   })
   .catchall(json.optional());
 
-const readSchema = z.object({ memory: memorySchema, version: z.string() });
-
 const searchSchema = z.object({
   memories: z.array(memorySchema),
   total: z.number(),
@@ -27,6 +26,16 @@ const importSchema = z.object({
   tombstones: z.array(json).default([]),
 });
 
+const receiptSchema = z.object({
+  receipts: z.array(
+    z.object({
+      identifier: z.string(),
+      status: z.enum(["accepted", "unchanged", "rejected"]),
+      reason: z.string().optional(),
+    }),
+  ),
+});
+
 const exportSchema = z
   .object({
     manifest: z.object({ x_omp_identity_map: z.array(json).optional() }).catchall(json.optional()),
@@ -35,12 +44,6 @@ const exportSchema = z
     next_cursor: z.string().nullable(),
   })
   .catchall(json.optional());
-
-type SearchInput = { query: string; limit: number; cursor?: string };
-
-type Reference = { identifier: string; origin?: string };
-
-type Selection = z.infer<typeof readSchema>;
 
 function element<T extends HTMLElement>(id: string, kind: { new (): T }): T {
   const found = document.getElementById(id);
@@ -52,28 +55,32 @@ function element<T extends HTMLElement>(id: string, kind: { new (): T }): T {
 
 const token = element("token", HTMLInputElement);
 const store = element("store", HTMLSelectElement);
-const title = element("title", HTMLInputElement);
-const body = element("body", HTMLTextAreaElement);
-const media = element("media", HTMLSelectElement);
-const query = element("query", HTMLInputElement);
-const results = element("results", HTMLUListElement);
-const more = element("more", HTMLButtonElement);
-const status = element("status", HTMLPreElement);
-let selection: Selection | undefined;
-let cursor: string | null = null;
-let busy = false;
+const prompt = element("prompt", HTMLTextAreaElement);
+const composer = element("composer", HTMLFormElement);
+const send = element("send", HTMLButtonElement);
+const newChat = element("new-chat", HTMLButtonElement);
+const messages = element("messages", HTMLElement);
+const status = element("status", HTMLParagraphElement);
+const connection = element("connection", HTMLDetailsElement);
+const memoriesPanel = element("memories-panel", HTMLDetailsElement);
 
-function controlsDisabled(disabled: boolean) {
-  for (const control of document.querySelectorAll("button, input, select, textarea")) {
-    if (
-      control instanceof HTMLButtonElement ||
-      control instanceof HTMLInputElement ||
-      control instanceof HTMLSelectElement ||
-      control instanceof HTMLTextAreaElement
-    )
-      control.disabled = disabled;
-  }
-}
+const toolLabels = new Map([
+  ["remember completed", "Saved a memory"],
+  ["search_memories completed", "Searched memories"],
+  ["read_memory completed", "Read a memory"],
+  ["remember failed", "Could not save memory"],
+  ["search_memories failed", "Could not search memories"],
+  ["read_memory failed", "Could not read memory"],
+]);
+
+const chatEnabled = !import.meta.env.DEV || import.meta.env.VITE_OMP_REMOTE_AI === true;
+let connected = false;
+let busy = false;
+let running = false;
+let cursor: string | null = null;
+let conversation = z.uuid().parse(crypto.randomUUID());
+let timer: ReturnType<typeof setTimeout> | undefined;
+let retry: { prompt: string; operationId: string } | undefined;
 
 if (import.meta.env.DEV) token.value = "local-development-token-only";
 
@@ -82,25 +89,43 @@ function report(message: string, error = false) {
   status.dataset.error = String(error);
 }
 
-async function request(path: string, data?: JsonInput) {
+function updateControls() {
+  send.disabled = !connected || busy || running || !chatEnabled;
+  newChat.disabled = busy || running;
+  store.disabled = busy || running;
+  element("connect", HTMLButtonElement).disabled = busy || running;
+
+  for (const id of ["refresh", "more", "export"])
+    element(id, HTMLButtonElement).disabled = !connected || busy || running;
+  element("import", HTMLInputElement).disabled = !connected || busy || running;
+}
+
+function action(operation: () => Promise<void>) {
+  return () => {
+    if (busy || running) return;
+    busy = true;
+    updateControls();
+    void operation()
+      .catch((error: Error) => report(error.message, true))
+      .finally(() => {
+        busy = false;
+        updateControls();
+      });
+  };
+}
+
+async function api(path: string, data?: JsonInput) {
   const options: RequestInit = {
+    method: data === undefined ? "GET" : "POST",
     headers: { authorization: "Bearer " + token.value, "content-type": "application/json" },
   };
 
-  if (data !== undefined) {
-    options.method = "POST";
-    options.body = JSON.stringify(data);
-  }
+  if (data !== undefined) options.body = JSON.stringify(data);
 
-  const response = await fetch(`/stores/${store.value}/${path}`, options);
+  const response = await fetch(path, options);
 
-  if (
-    response.headers.get("content-type")?.split(";").at(0)?.trim().toLowerCase() !==
-    "application/json"
-  )
-    throw new Error(
-      `HTTP ${response.status}: the server returned ${response.headers.get("content-type") ?? "no content type"} instead of JSON. Refresh to check the current record before retrying.`,
-    );
+  if (response.headers.get("content-type")?.split(";").at(0) !== "application/json")
+    throw new Error(`HTTP ${response.status}: unexpected server response. Reconnect to resume.`);
   const value = json.parse(await response.json());
 
   if (!response.ok) throw new Error(`${response.status}: ${JSON.stringify(value)}`);
@@ -108,80 +133,160 @@ async function request(path: string, data?: JsonInput) {
   return value;
 }
 
-function clear() {
-  selection = undefined;
-  title.value = "";
-  body.value = "";
-  media.value = "text/markdown";
-  element("editor-title", HTMLHeadingElement).textContent = "New memory";
-  element("reference", HTMLParagraphElement).textContent = "";
-  element("delete", HTMLButtonElement).hidden = true;
+const request = (path: string, data?: JsonInput) => api(`/stores/${store.value}/${path}`, data);
+const chatPath = () => `/api/chat/${conversation}?store=${store.value}`;
+
+function session() {
+  const saved = sessionStorage.getItem("omp-chat-" + store.value);
+  const parsed = z.uuid().safeParse(saved);
+  conversation = parsed.success ? parsed.data : crypto.randomUUID();
+  sessionStorage.setItem("omp-chat-" + store.value, conversation);
+  retry = undefined;
 }
 
-function action(operation: () => Promise<void>) {
-  return () => {
-    if (busy) return;
-    busy = true;
-    controlsDisabled(true);
-    void operation()
-      .catch((error: Error) => report(error.message, true))
-      .finally(() => {
-        busy = false;
-        controlsDisabled(false);
-      });
-  };
+function render(view: ChatView) {
+  const previous = messages.textContent;
+
+  const nodes = view.messages.map((message) => {
+    const node = document.createElement("article");
+    node.className = "message " + message.role;
+    node.setAttribute(
+      "aria-label",
+      message.role === "user" ? "You" : message.role === "tool" ? "Memory activity" : "Assistant",
+    );
+    node.textContent =
+      message.role === "tool" ? (toolLabels.get(message.text) ?? message.text) : message.text;
+
+    return node;
+  });
+
+  if (view.earlier) {
+    const notice = document.createElement("p");
+    notice.className = "hint";
+    notice.textContent = "Showing the latest part of this conversation.";
+    nodes.unshift(notice);
+  }
+
+  if (view.streaming.length > 0) {
+    const node = document.createElement("article");
+    node.className = "message assistant streaming";
+    node.setAttribute("aria-label", "Assistant is responding");
+    node.textContent = view.streaming;
+    nodes.push(node);
+  }
+
+  messages.replaceChildren(...nodes);
+  element("empty", HTMLElement).hidden = nodes.length > 0;
+  running = view.busy;
+  updateControls();
+
+  if (view.failure !== null && !view.busy)
+    report(
+      `The agent could not finish (${view.failure}). Check Workers AI configuration, then send a follow-up.`,
+      true,
+    );
+  else report(view.busy ? "Thinking…" : "");
+
+  if (
+    previous !== messages.textContent &&
+    window.scrollY + window.innerHeight >= document.body.scrollHeight - 250
+  )
+    window.scrollTo({ top: document.body.scrollHeight });
+}
+
+async function poll() {
+  try {
+    const view = chatView.parse(await api(chatPath()));
+    render(view);
+
+    if (view.busy)
+      timer = setTimeout(() => {
+        void poll();
+      }, 900);
+    else await load();
+
+    return true;
+  } catch (error) {
+    running = false;
+    updateControls();
+    report(
+      error instanceof Error ? error.message : "Connection interrupted. Reconnect to resume.",
+      true,
+    );
+
+    return false;
+  }
 }
 
 async function load(append = false) {
-  const data: SearchInput = { query: query.value, limit: 20 };
+  const page = searchSchema.parse(
+    await request("fmp/search", {
+      query: "",
+      limit: 20,
+      cursor: append ? (cursor ?? undefined) : undefined,
+    }),
+  );
 
-  if (append && cursor !== null) data.cursor = cursor;
-  const page = searchSchema.parse(await request("fmp/search", data));
+  const list = element("memories", HTMLUListElement);
 
-  if (!append) results.replaceChildren();
-  cursor = page.next_cursor;
-  more.hidden = cursor === null;
-  element("count", HTMLParagraphElement).textContent = `${page.total} memories in this search`;
+  if (!append) list.replaceChildren();
 
   for (const memory of page.memories) {
     const item = document.createElement("li");
-    const button = document.createElement("button");
     const name = document.createElement("strong");
-    const snippet = document.createElement("span");
-    name.textContent = memory.title ?? memory.identifier;
-    snippet.textContent = memory.body.slice(0, 130);
-    button.type = "button";
-    button.append(name, snippet);
-    button.addEventListener(
-      "click",
-      action(async () => {
-        const reference: Reference = {
-          identifier: memory.identifier,
-        };
-
-        if (memory.x_omp_origin !== undefined) reference.origin = memory.x_omp_origin;
-        selection = readSchema.parse(await request("fmp/read", reference));
-        title.value = selection.memory.title ?? "";
-        body.value = selection.memory.body;
-        media.value = selection.memory.media_type;
-        element("editor-title", HTMLHeadingElement).textContent = "Edit memory";
-        element("reference", HTMLParagraphElement).textContent =
-          `${selection.memory.identifier} · ${selection.memory.x_omp_origin ?? ""}`;
-        element("delete", HTMLButtonElement).hidden = false;
-        report("Loaded current memory and its version. Imported memories are read-only here.");
-      }),
-    );
-    item.append(button);
-    results.append(item);
+    const text = document.createElement("span");
+    name.textContent = memory.title ?? "Saved memory";
+    text.textContent = memory.body;
+    item.append(name, text);
+    list.append(item);
   }
+
+  if (page.total === 0)
+    list.textContent = "Nothing saved yet. Ask the agent to remember something.";
+  cursor = page.next_cursor;
+  element("more", HTMLButtonElement).hidden = cursor === null;
+  element("memory-count", HTMLSpanElement).textContent = page.total > 0 ? " " + page.total : "";
 }
 
 element("connect", HTMLButtonElement).addEventListener(
   "click",
   action(async () => {
-    clear();
+    clearTimeout(timer);
+    connected = false;
+    session();
     await load();
-    report("Connected to " + store.value + ".");
+
+    if (!(await poll())) return;
+    connected = true;
+    connection.open = false;
+    element("connection-label", HTMLElement).textContent =
+      store.value === "personal" ? "Personal" : "Company";
+
+    if (!chatEnabled)
+      report("Local memory is connected. Restart with OMP_REMOTE_AI=true for chat.");
+  }),
+);
+
+store.addEventListener("change", () => {
+  connected = false;
+  updateControls();
+  report("Connect to open this store.");
+});
+
+newChat.addEventListener(
+  "click",
+  action(async () => {
+    if (!connected) {
+      connection.open = true;
+
+      return;
+    }
+
+    clearTimeout(timer);
+    sessionStorage.removeItem("omp-chat-" + store.value);
+    session();
+    await poll();
+    prompt.focus();
   }),
 );
 
@@ -190,68 +295,58 @@ element("refresh", HTMLButtonElement).addEventListener(
   action(() => load()),
 );
 
-more.addEventListener(
+element("more", HTMLButtonElement).addEventListener(
   "click",
   action(() => load(true)),
 );
 
-store.addEventListener(
-  "change",
-  action(async () => {
-    clear();
-    await load();
-    report("Opened " + store.value + ".");
-  }),
-);
-
-element("new", HTMLButtonElement).addEventListener("click", clear);
-
-element("search-form", HTMLFormElement).addEventListener("submit", (event) => {
-  event.preventDefault();
-  action(() => load())();
+memoriesPanel.addEventListener("toggle", () => {
+  if (memoriesPanel.open) connection.open = false;
 });
 
-element("editor", HTMLFormElement).addEventListener("submit", (event) => {
+connection.addEventListener("toggle", () => {
+  if (connection.open) memoriesPanel.open = false;
+});
+
+for (const button of document.querySelectorAll("[data-prompt]")) {
+  if (!(button instanceof HTMLButtonElement)) continue;
+  button.addEventListener("click", () => {
+    prompt.value = button.dataset.prompt ?? "";
+
+    if (!connected) connection.open = true;
+    else prompt.focus();
+  });
+}
+
+composer.addEventListener("submit", (event) => {
   event.preventDefault();
   action(async () => {
-    const patch = { body: body.value, title: title.value || undefined, media_type: media.value };
-    const payload = json.parse(JSON.parse(JSON.stringify(patch)));
-    let saved;
+    if (!connected) {
+      connection.open = true;
 
-    if (selection === undefined)
-      saved = await request("fmp/upload/inferences", { memory: payload });
-    else
-      saved = await request("fmp/update", {
-        identifier: selection.memory.identifier,
-        origin: selection.memory.x_omp_origin ?? "",
-        if_version: selection.version,
-        patch: payload,
-      });
-    const current = readSchema.parse(saved);
-    clear();
-    await load();
-    report("Saved " + current.memory.identifier + ". A new Artifacts commit records this change.");
+      return;
+    }
+
+    const text = prompt.value.trim();
+
+    if (text.length === 0) return;
+
+    if (retry?.prompt !== text) retry = { prompt: text, operationId: crypto.randomUUID() };
+    await api(chatPath(), retry);
+    prompt.value = "";
+    retry = undefined;
+    running = true;
+    await poll();
   })();
 });
 
-element("delete", HTMLButtonElement).addEventListener(
-  "click",
-  action(async () => {
-    if (
-      selection === undefined ||
-      !confirm("Remove this memory from current views? Its content remains in Git history.")
-    )
-      return;
-    await request("fmp/delete", {
-      identifier: selection.memory.identifier,
-      origin: selection.memory.x_omp_origin ?? "",
-      if_version: selection.version,
-    });
-    clear();
-    await load();
-    report("Deleted from current views. A tombstone blocks stale imports; history is retained.");
-  }),
-);
+prompt.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+
+    if (!send.disabled) composer.requestSubmit();
+  }
+});
 
 element("export", HTMLButtonElement).addEventListener(
   "click",
@@ -299,10 +394,12 @@ file.addEventListener(
       throw new Error("File limit: 16 MiB. Imports are split into bounded API requests.");
     const snapshot = importSchema.parse(JSON.parse(await selected.text()));
 
-    const receipt = await request("fmp/import", {
-      ...snapshot,
-      tombstones: snapshot.tombstones.slice(0, 50),
-    });
+    const receipt = receiptSchema.parse(
+      await request("fmp/import", {
+        ...snapshot,
+        tombstones: snapshot.tombstones.slice(0, 50),
+      }),
+    );
 
     async function append(offset: number): Promise<void> {
       if (offset >= snapshot.tombstones.length) return;
@@ -317,8 +414,18 @@ file.addEventListener(
 
     await append(50);
     file.value = "";
-    clear();
     await load();
-    report("Import receipts (check for rejected identities):\n" + JSON.stringify(receipt, null, 2));
+
+    const counts = ["accepted", "unchanged", "rejected"].map(
+      (outcome) => `${receipt.receipts.filter((r) => r.status === outcome).length} ${outcome}`,
+    );
+
+    const rejected = receipt.receipts.flatMap((r) =>
+      r.status === "rejected" ? [`${r.identifier}: ${r.reason ?? "conflict"}`] : [],
+    );
+
+    report(`Import: ${counts.join(", ")}. ${rejected.join("; ")}`, rejected.length > 0);
   }),
 );
+
+updateControls();

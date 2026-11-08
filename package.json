@@ -29,9 +29,14 @@
     "test:e2e": "vpx scripts/test-e2e.ts",
     "verify": "npm run check && npm test && npm run build && npm run test:e2e",
     "test:quality": "vpx scripts/check-quality.ts",
-    "concurrency:roundtrip": "vpx scripts/concurrency-roundtrip.ts"
+    "concurrency:roundtrip": "vpx scripts/concurrency-roundtrip.ts",
+    "agent:roundtrip": "vpx scripts/agent-roundtrip.ts"
   },
   "dependencies": {
+    "@earendil-works/chord": "~1.5.0",
+    "@earendil-works/pi-ai": "~1.5.0",
+    "@earendil-works/pi-durable": "~1.5.0",
+    "@earendil-works/pi-schema": "~1.5.0",
     "@modelcontextprotocol/server": "2.4.0",
     "agents": "0.33.0",
     "isomorphic-git": "1.44.11",

@@ -46,3 +46,13 @@ Generate a new `MEMORY_API_TOKEN` and run `npm run deploy` with it set. Update c
 Deleting the Worker does not erase Artifacts repositories. Export anything needed, then explicitly delete its dedicated namespace from your Cloudflare account if permanent teardown is intended. Do not delete a namespace shared with another Worker. Local reset is separate: stop dev, then remove `.cloudflare/state`.
 
 Sources: [cf setup](https://developers.cloudflare.com/cf/get-started/), [programmatic configuration](https://developers.cloudflare.com/cf/projects/cloudflare-config/), [deploy buttons](https://developers.cloudflare.com/workers/platform/deploy-buttons/), [Artifacts setup](https://developers.cloudflare.com/artifacts/get-started/).
+
+## Pi chat agent
+
+The Worker also declares `MemoryAgent`, a SQLite Durable Object class, and the `AI` Workers AI binding. `cf` reconciles the Durable Object export on deployment; no namespace ID is checked into source. The deploy-button metadata declares the same class and binding. Copied project names are also used by the self-binding, so a new template deployment gets its own conversation namespace.
+
+`CHAT_MODEL` is configured in `cloudflare.config.ts` as `@cf/zai-org/glm-5.3-flash`. Change that setting to a compatible Workers AI model if needed. It affects newly created Pi conversations; existing sessions retain their model reference. Pi packages are pinned to the supported 1.5 minor line and exact installed versions are in the lockfile. Roll forward rather than rolling back to an incompatible Pi storage version.
+
+Remote AI is opt-in locally: `OMP_REMOTE_AI=true npm run dev`, after `cf auth login` and account selection. Artifacts remains explicitly local even with AI enabled; local chats use local SQLite, and only model inference goes to Workers AI. The default `npm run dev` and CI do not make paid inference calls. Production always uses the real AI binding. Review [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) and [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/).
+
+For deployment from a copied template, ensure the build token has Workers Scripts Edit and Artifacts Edit, and can deploy the declared Durable Object and Workers AI bindings. The operator bearer token remains a separate private runtime secret. No model provider API key is needed.
