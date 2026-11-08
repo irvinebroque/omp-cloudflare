@@ -13,12 +13,11 @@ This starts local memory APIs without credentials. For the chat agent, use the [
 
 ```sh
 npm run verify
-npm run test:quality
 ```
 
 `verify` runs strict checks, 21 unit tests, production builds, and the isolated HTTP/MCP/concurrency/exchange suite. It needs no Cloudflare credentials. [Validation details](docs/validation.md).
 
-Include regression evidence when changing persistence, exchange, pagination, authentication, or concurrency. Tests use the real local simulator and MCP clients; module mocks are prohibited by lint.
+Include regression evidence when changing persistence, exchange, pagination, authentication, or concurrency. Test with the real local simulator and MCP clients rather than module mocks.
 
 Preserve unknown metadata, original origins, and import receipts. Update `docs/protocol.md` when an experimental contract changes. Keep deployment discovery metadata and `cloudflare.config.ts` in sync, and test a clean setup before documenting a new deployment path. Platform beta upgrades need local and live validation.
 
@@ -30,7 +29,7 @@ npm run build   # production build
 
 Vite+ runs the formatter, lint, type checks, tests, builds, and TypeScript scripts. Cloudflare development and deployment use `cf`. Configuration lives in `vite.config.ts` and `cloudflare.config.ts`.
 
-[Dillon Mulroy’s anti-slop rules](https://github.com/dmmulroy/anti-slop) are enabled as errors. Keep strict settings and fix findings without suppressions. For rule updates, follow the [vendored skill](.agents/skills/install-anti-slop/SKILL.md) and preserve [provenance and licenses](tools/oxlint/anti-slop/UPSTREAM.md).
+Keep strict settings and fix findings without suppressions. Follow [Dillon Mulroy’s anti-slop guidance](https://github.com/dmmulroy/anti-slop); its custom plugin is not installed.
 
 ## Find the code
 

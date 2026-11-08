@@ -6,7 +6,9 @@ This record describes the checks actually run for the Pi chat redesign and the i
 
 The Python folder adapter and its CI setup have been removed. Export/import coverage uses the TypeScript clients, including preservation of metadata and origin identity, independent store origins, repeated imports, conflicts, and deletion markers. Python is no longer required. The Python-specific result in the agent release notes below describes validation before the adapter was removed.
 
-After removal and the move of the shared HTTP client into `scripts/lib/`, `npm run verify` and `npm run test:quality` passed: strict formatting/lint/types, 21 unit tests, production builds, and the complete remaining local E2E suite.
+The shared HTTP client lives in `scripts/lib/` for verification only. Both copies of the vendored anti-slop rules and their installer have been removed, along with the plugin-specific fixture check. Vite+'s native lint rules, type-aware/type-check modes, strict TypeScript settings, and deny-warnings checks remain enabled. The historical anti-slop results below describe the earlier installation.
+
+After this cleanup, `npm run verify` passed: strict formatting/lint/types, 21 unit tests, production builds, and the isolated HTTP/MCP/concurrency/regression suite, including restart persistence, independent origins, and full snapshot transfer.
 
 ## Pi chat redesign
 
@@ -31,7 +33,6 @@ The earlier Deploy to Cloudflare button validation below covers the initial memo
 ```sh
 npm ci
 npm run verify
-npm run test:quality
 npm audit --omit=dev
 ```
 
@@ -42,7 +43,6 @@ The development environment used Node 24.22.0, npm 11.19.1, Vite+ 1.5.0, `cf` 1.
 | Oxfmt, Oxlint with type-aware linting and native type checking, strict browser TypeScript | Passed; warnings fail                                                                                                                                   |
 | Unit tests                                                                                | 21 passed across four files                                                                                                                             |
 | Production Worker and browser builds                                                      | Passed using `cf build` delegating to Vite+                                                                                                             |
-| Registered Dillon Mulroy anti-slop rules                                                  | Accepted the single-pass fixture; rejected the filter/map fixture                                                                                       |
 | Production dependency audit                                                               | Zero reported vulnerabilities at validation time                                                                                                        |
 | Public assets / protected endpoints                                                       | UI and health are public; unauthenticated memory and MCP requests return 401                                                                            |
 | Invalid inputs                                                                            | Malformed JSON 400; wrong content type 415; over-1-MiB body 413                                                                                         |

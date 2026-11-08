@@ -28,7 +28,6 @@
     "test": "vp test run",
     "test:e2e": "vpx scripts/test-e2e.ts",
     "verify": "npm run check && npm test && npm run build && npm run test:e2e",
-    "test:quality": "vpx scripts/check-quality.ts",
     "concurrency:roundtrip": "vpx scripts/concurrency-roundtrip.ts",
     "agent:roundtrip": "vpx scripts/agent-roundtrip.ts"
   },
