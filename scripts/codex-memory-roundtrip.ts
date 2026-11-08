@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
-import { OmpClient } from "../sdk/client.ts";
+import { OmpClient } from "./lib/memory-client.ts";
 import { ApiError, jsonValue } from "../src/protocol/model.ts";
 
 const execute = promisify(execFile);

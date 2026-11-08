@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { OmpClient } from "../sdk/client.ts";
+import { OmpClient } from "./lib/memory-client.ts";
 import { ApiError } from "../src/protocol/model.ts";
 
 const base = process.argv[2] ?? "http://localhost:5173";

@@ -22,7 +22,6 @@
     "src",
     "cloudflare.config.ts",
     ".cloudflare/types",
-    "sdk",
     "scripts",
     "vite.config.ts",
     "tests"

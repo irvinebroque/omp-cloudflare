@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { z } from "zod";
-import { OmpClient, OmpGateway, type Store } from "../sdk/client.ts";
+import { OmpClient, OmpGateway, type Store } from "./lib/memory-client.ts";
 import { ApiError, archive, type JsonInput, type Memory } from "../src/protocol/model.ts";
 import { readResponse } from "../src/protocol/contracts.ts";
 

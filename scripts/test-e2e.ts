@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as pause } from "node:timers/promises";
 import { ApiError } from "../src/protocol/model.ts";
-import { OmpClient } from "../sdk/client.ts";
+import { OmpClient } from "./lib/memory-client.ts";
 
 const temporary = await mkdtemp(join(tmpdir(), "omp-e2e-"));
 const port = process.env.OMP_E2E_PORT ?? "5191";
@@ -167,7 +167,7 @@ try {
     () => client.read("restart-canary"),
     (error: Error) => error instanceof ApiError && error.status === 404,
   );
-  console.log("PASS bounded request validation and full SDK multi-page snapshots");
+  console.log("PASS bounded request validation and full multi-page snapshots");
   console.log(
     "PASS authentication, public UI, process restart, separate origins, HTTP, MCP, concurrency and regression suites",
   );

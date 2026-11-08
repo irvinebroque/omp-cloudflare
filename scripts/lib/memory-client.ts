@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { Archive, JsonInput, Memory } from "../src/protocol/model.ts";
+import type { Archive, JsonInput, Memory } from "../../src/protocol/model.ts";
 import {
   decodeResponse,
   requestOptions,
@@ -14,16 +14,13 @@ import {
   storeInfoResponse,
   gatewayInfoResponse,
   storeSchema,
-} from "../src/protocol/contracts.ts";
-
-export type { Archive, Memory, Receipt } from "../src/protocol/model.ts";
+} from "../../src/protocol/contracts.ts";
 
 export type Store = z.infer<typeof storeSchema>;
 
-export type MemoryInput = Partial<Memory> & Pick<Memory, "body">;
+type MemoryInput = Partial<Memory> & Pick<Memory, "body">;
 
-export type SavedMemory = z.infer<typeof savedResponse>;
-
+/** HTTP client shared by the verification scripts. */
 export class OmpClient {
   baseUrl: string;
   store: Store;

@@ -53,7 +53,7 @@ To transfer memories, **Export** under **Memories**, connect to the other store,
 
 ## More
 
-- [HTTP, TypeScript, and MCP examples](docs/clients.md)
+- [HTTP and MCP examples](docs/clients.md)
 - [Codex setup](codex/README.md)
 - [Agent architecture](docs/agent.md) · [Protocol coverage and limits](docs/protocol.md)
 - [Contributing](CONTRIBUTING.md) · [Validation](docs/validation.md)

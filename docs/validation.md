@@ -6,7 +6,7 @@ This record describes the checks actually run for the Pi chat redesign and the i
 
 The Python folder adapter and its CI setup have been removed. Export/import coverage uses the TypeScript clients, including preservation of metadata and origin identity, independent store origins, repeated imports, conflicts, and deletion markers. Python is no longer required. The Python-specific result in the agent release notes below describes validation before the adapter was removed.
 
-After removal, `npm run verify` and `npm run test:quality` passed: strict formatting/lint/types, 21 unit tests, production builds, and the complete remaining local E2E suite.
+After removal and the move of the shared HTTP client into `scripts/lib/`, `npm run verify` and `npm run test:quality` passed: strict formatting/lint/types, 21 unit tests, production builds, and the complete remaining local E2E suite.
 
 ## Pi chat redesign
 
@@ -51,7 +51,7 @@ The development environment used Node 24.22.0, npm 11.19.1, Vite+ 1.5.0, `cf` 1.
 | MCP scenarios                                                                             | 8 checks: initialize/discover, resources, six tools, context applicability, provenance, conditional writes/deletes, invalid arguments, concurrent edits |
 | Portability regressions                                                                   | 6 checks: opaque IDs and extension data, evidence, pagination, collision-safe exports, idempotence, and multi-page tombstone replay prevention          |
 | Request-isolation concurrency                                                             | Four simultaneous HTTP requests per wave across both stores; 16 records read back and removed                                                           |
-| Full snapshot SDK                                                                         | Collects every tombstone page and imports bounded chunks; stale deleted content stays absent                                                            |
+| Full snapshots                                                                            | Collects every tombstone page and imports bounded chunks; stale deleted content stays absent                                                            |
 
 The E2E runner uses fresh temporary Artifacts simulators and removes them afterward. Its server restart and independent-origin checks do not depend on an existing developer checkout or Cloudflare credentials. Live test records are removed from current views; Git history and deletion markers retain them.
 
@@ -67,7 +67,7 @@ The **Deploy to Cloudflare button was exercised in the actual authenticated dash
 
 The first button attempt exposed a mismatch between the name rewritten in `wrangler.jsonc` and the name used by `cf`. The shared project-settings loader and its unit test fix that path. Preview builds were disabled; preview deployment is not part of this validation. The copied repository also rebuilt successfully from the final application changes (build `3ec48463-8b99-40d3-9e9a-ea43860fd76f`, Worker version `27306801-8415-409a-b1e0-8f60928bb1d5`), preserving the private runtime secret. Temporary Workers and namespaces were removed after validation, their private GitHub copies archived, and the dedicated build token removed. The primary demo remains deployed.
 
-Live concurrency also exposed upstream `isomorphic-git` locks shared across requests, which Workers canceled as hung. The final implementation isolates those locks per mutation using the adapter described in [protocol notes](protocol.md#git-request-isolation). Both local E2E and live concurrent requests passed with that adapter, including a second independently provisioned Worker. SDK and browser clients report a non-JSON upstream failure with its HTTP status instead of hiding it behind a JSON parse error.
+Live concurrency also exposed upstream `isomorphic-git` locks shared across requests, which Workers canceled as hung. The final implementation isolates those locks per mutation using the adapter described in [protocol notes](protocol.md#git-request-isolation). Both local E2E and live concurrent requests passed with that adapter, including a second independently provisioned Worker. HTTP and browser clients report a non-JSON upstream failure with its HTTP status instead of hiding it behind a JSON parse error.
 
 For your own deployment:
 

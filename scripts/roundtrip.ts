@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { OmpClient, OmpGateway } from "../sdk/client.ts";
+import { OmpClient, OmpGateway } from "./lib/memory-client.ts";
 
 const base = process.argv[2];
 

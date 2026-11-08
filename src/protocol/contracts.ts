@@ -74,7 +74,7 @@ export const gatewayInfoResponse = z.object({
 
 const errorResponse = z.object({ error: z.string() });
 
-/** Validate every JSON response before exposing it to MCP or SDK callers. */
+/** Validate every JSON response before returning it to callers. */
 export async function decodeResponse<S extends z.ZodType>(
   response: Response,
   schema: S,

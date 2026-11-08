@@ -40,8 +40,8 @@ src/protocol/    Validation and exchange
 src/storage/     Artifacts storage and Git commits
 src/server/      HTTP, MCP, authentication, and routing
 src/web/         Browser chat UI
-sdk/             TypeScript clients
 scripts/         Deployment, setup, and verification
+scripts/lib/     Internal HTTP client for verification
 codex/           MCP configuration and memory skill
 tests/           Unit tests
 ```

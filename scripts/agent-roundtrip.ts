@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { setTimeout as pause } from "node:timers/promises";
 import { z } from "zod";
 import { chatView } from "../src/agent/contracts.ts";
-import { OmpClient } from "../sdk/client.ts";
+import { OmpClient } from "./lib/memory-client.ts";
 
 const base = (process.argv[2] ?? "http://localhost:5173").replace(/\/$/u, "");
 const token = process.env.OMP_API_TOKEN;

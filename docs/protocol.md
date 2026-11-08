@@ -39,7 +39,7 @@ sequenceDiagram
 
 Search cursors bind to the arguments and current commit(s). Changing a query or writing to either participating store invalidates a cursor with 409. Restart traversal after reconciling. Gateway results attribute each hit to its store and report `partial` if a store is unavailable.
 
-Export places active memories in the first page and up to 50 tombstones in each page. `OmpClient.snapshot()` collects every page. `importSnapshot()` splits a collected snapshot into bounded requests; successful earlier requests remain committed if a later request fails. Inspect errors and receipts and safely repeat identical imports. No multi-request atomicity is claimed.
+Export places active memories in the first page and up to 50 tombstones in each page. Follow `next_cursor` until it is null to collect a complete snapshot. Split imports into bounded requests; successful earlier requests remain committed if a later request fails. Inspect errors and receipts and safely repeat identical imports. No multi-request atomicity is claimed.
 
 ## Runtime retrieval
 
