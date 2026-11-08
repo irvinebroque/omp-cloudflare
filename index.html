@@ -38,25 +38,35 @@
         <details id="connection">
           <summary id="connection-label">Connect</summary>
           <section class="popover connection" aria-label="Connection">
-            <h2>Connect your memory</h2>
+            <h2>Connect to your demo</h2>
+            <p id="access-key-help" class="hint">
+              A shared password that unlocks chat and both memory stores.
+            </p>
             <label
-              >Operator token<input
+              >Access key<input
                 id="token"
                 type="password"
                 autocomplete="off"
-                placeholder="MEMORY_API_TOKEN"
+                placeholder="Paste your access key"
+                aria-describedby="access-key-help access-key-source"
             /></label>
+            <p id="access-key-source" class="hint">
+              Use the key saved during deployment.
+              <a
+                href="https://github.com/irvinebroque/omp-cloudflare/blob/main/docs/deployment.md#access-key"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Where to find it ↗</a
+              >
+            </p>
             <label
-              >Store<select id="store">
+              >Memory store<select id="store">
                 <option value="personal">Personal</option>
                 <option value="company">Company</option>
               </select></label
             >
             <button id="connect" class="solid" type="button">Connect</button>
-            <p class="hint">
-              The token stays in this tab. Both stores share it. Chats persist in Durable Objects;
-              new chats keep your OMP memories.
-            </p>
+            <p class="hint">Sent only to this demo. Forgotten when you refresh.</p>
           </section>
         </details>
       </nav>

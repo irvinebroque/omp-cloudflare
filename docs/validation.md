@@ -4,6 +4,12 @@ This record describes the checks actually run for the Pi chat redesign and the i
 
 ## Pi chat redesign
 
+### Access key clarification
+
+Worker version `8db45a26-7050-4c98-a8af-56303f181142` replaces the browser's “Operator token” label with “Access key,” explains its scope and refresh behavior, and links to the deployment instructions. The deployed browser showed the new copy, rejected an invalid key with the new actionable message, and connected successfully with the existing key. `npm run verify` and `npm run test:quality` passed; no model inference was needed for this wording change. The Pi behavior checks below cover the preceding agent release.
+
+### Agent release
+
 The minimal chat implementation is source commit `a68c19d5c0624862566fd013c080bf96b0f5ceec`, deployed with `cf` as Worker version `67121922-117d-441c-85bc-746219f50f3d`. The production build provisions a SQLite `MemoryAgent` Durable Object and the Workers AI binding. [Source CI](https://github.com/irvinebroque/omp-cloudflare/actions/runs/42496376555) repeats the full local suite.
 
 `npm run verify` passed all 21 unit tests, the production builds, the authenticated chat boundary (401/400/405), and the complete isolated local HTTP/MCP/Python/concurrency/regression suite. The anti-slop fixture check and production dependency audit also passed with zero reported vulnerabilities.

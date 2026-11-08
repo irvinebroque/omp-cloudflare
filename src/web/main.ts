@@ -128,6 +128,11 @@ async function api(path: string, data?: JsonInput) {
     throw new Error(`HTTP ${response.status}: unexpected server response. Reconnect to resume.`);
   const value = json.parse(await response.json());
 
+  if (response.status === 401)
+    throw new Error(
+      "Access key not recognized. Check the key saved during deployment, then reconnect.",
+    );
+
   if (!response.ok) throw new Error(`${response.status}: ${JSON.stringify(value)}`);
 
   return value;

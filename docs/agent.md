@@ -44,7 +44,7 @@ The UI shows the newest Pi transcript window and labels a truncated history. It 
 
 Conversation entries remain in Durable Object SQLite. They are not automatically OMP memories and do not appear in snapshots. Only tool-saved memory records live in Artifacts. Export/import preserves their identity and extension metadata just as for other OMP clients. An imported fact can be recalled by a new chat in the receiving store. Importing a snapshot does not import a Pi transcript or transfer a running agent.
 
-The same operator token protects chat, MCP, memory routes, and history. This is not multi-user authorization, and chat IDs are not credentials. Memory text used by the agent is sent to the configured Workers AI model. Do not put secrets or sensitive sample data into validation prompts. Git deletion retains history, and the demo has no secure-forgetting mechanism for either storage layer.
+The same access key (`MEMORY_API_TOKEN`) protects chat, MCP, memory routes, and history. This is not multi-user authorization, and chat IDs are not credentials. Memory text used by the agent is sent to the configured Workers AI model. Do not put secrets or sensitive sample data into validation prompts. Git deletion retains history, and the demo has no secure-forgetting mechanism for either storage layer.
 
 ## Validate with a real model
 

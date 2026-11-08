@@ -227,6 +227,13 @@ footer {
   display: grid;
   gap: 0.8rem;
 }
+.connection > p {
+  margin: 0;
+}
+.connection .hint a {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
 .connection label {
   display: grid;
   gap: 0.3rem;

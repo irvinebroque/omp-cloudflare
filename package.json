@@ -65,7 +65,7 @@
   "cloudflare": {
     "bindings": {
       "MEMORY_API_TOKEN": {
-        "description": "A private bearer token of at least 24 characters. Generate one with `openssl rand -hex 32`. Enter it in the browser demo or set OMP_API_TOKEN for clients."
+        "description": "The private access key for this demo. Generate at least 24 characters with `openssl rand -hex 32` and save the value: you will paste it into Connect → Access key. It unlocks chat and both memory stores. Use the same value as OMP_API_TOKEN for clients."
       }
     }
   }

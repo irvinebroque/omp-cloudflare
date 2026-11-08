@@ -24,6 +24,17 @@ For Workers Builds, the selected API token needs Workers Scripts write permissio
 
 The runtime `MEMORY_API_TOKEN` and the Cloudflare deployment API token are different secrets. Never put the Cloudflare API token in the browser. The browser sends only the runtime token to its own origin and retains it only in tab memory.
 
+## Access key
+
+The browser's **Access key** is the shared password for your deployed demo. Anyone with it can chat with the agent and access both Personal and Company memory stores, including memory changes through the API. Keep it private.
+
+- **You deployed the demo:** use the value you created and saved as `MEMORY_API_TOKEN` during deployment. Paste that same value into **Connect → Access key**.
+- **Someone shared their deployment with you:** ask its owner for the access key.
+- **You are running locally:** the development key is filled in automatically.
+- **You lost your deployment's key:** generate a replacement and redeploy using the [rotation instructions](#rotate-and-remove). Existing clients will need the new key.
+
+The browser sends the key only to this demo with its requests. It keeps the value in tab memory and forgets it on refresh. Enter the demo's key here; Cloudflare API tokens are used separately for deployment.
+
 ## Common failures
 
 | Symptom                                                 | Resolution                                                                                              |
@@ -55,4 +66,4 @@ The Worker also declares `MemoryAgent`, a SQLite Durable Object class, and the `
 
 Remote AI is opt-in locally: `OMP_REMOTE_AI=true npm run dev`, after `cf auth login` and account selection. Artifacts remains explicitly local even with AI enabled; local chats use local SQLite, and only model inference goes to Workers AI. The default `npm run dev` and CI do not make paid inference calls. Production always uses the real AI binding. Review [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) and [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/).
 
-For deployment from a copied template, ensure the build token has Workers Scripts Edit and Artifacts Edit, and can deploy the declared Durable Object and Workers AI bindings. The operator bearer token remains a separate private runtime secret. No model provider API key is needed.
+For deployment from a copied template, ensure the build token has Workers Scripts Edit and Artifacts Edit, and can deploy the declared Durable Object and Workers AI bindings. The demo access key remains a separate private runtime secret. No model provider API key is needed.
