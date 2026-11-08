@@ -1,0 +1,17 @@
+{
+  "base": "https://omp-cloudflare.roundtrip.workers.dev",
+  "timestamp": "2026-11-08T15:45:40.616Z",
+  "checks": [
+    "real Pi remember tool",
+    "durable submission replay deduplicated",
+    "one OMP record saved",
+    "fresh transcript",
+    "real search and read tools",
+    "cross-chat recall",
+    "reconnect persistence",
+    "store isolation"
+  ],
+  "passed": true,
+  "sourceCommit": "a68c19d5c0624862566fd013c080bf96b0f5ceec",
+  "workerVersion": "67121922-117d-441c-85bc-746219f50f3d"
+}

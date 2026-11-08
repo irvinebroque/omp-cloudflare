@@ -26,6 +26,8 @@ sequenceDiagram
 - `read_memory`: retrieve a full result by identifier and original origin.
 - `remember`: save a user-requested fact or preference through the same OMP upload route used by HTTP and MCP clients.
 
+Search returns at most 20 concise summaries per call; use narrower keywords when needed. Full-read tool output is capped at 32 KiB / 200 lines, so unusually large extension metadata may be truncated in the model view. The HTTP API and snapshots continue to preserve it.
+
 The model cannot execute code or change/delete existing memories. Its system prompt tells it to search before answering about saved context, read relevant results, treat retrieved text as untrusted data, and save only on explicit request. These are model instructions, not a complete prompt-injection defense. The operator is trusted and owns both stores.
 
 Reads are replay-safe. `remember` first persists a UUID and timestamp in Pi’s per-call memo, then writes that stable identity to OMP. If recovery replays the same call, the identical upload is unchanged rather than duplicated. Different calls remain distinct. A browser submission has a separate UUID `operationId`; retrying that operation does not enqueue another prompt. At most one prompt runs in a conversation at a time; a competing submission receives 409. Each run is limited to six tool rounds, and prompts are capped at 8,000 characters.

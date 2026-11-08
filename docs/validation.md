@@ -1,6 +1,18 @@
 # Validation record — November 8, 2026
 
-This record describes the checks actually run for the initial standalone example. It is evidence for these versions and environments, not an OMP conformance certification or a claim that every Cloudflare account has the same plan and permissions.
+This record describes the checks actually run for the Pi chat redesign and the initial standalone example. It is evidence for these versions and environments, not an OMP conformance certification or a claim that every Cloudflare account has the same plan and permissions.
+
+## Pi chat redesign
+
+The minimal chat implementation is source commit `a68c19d5c0624862566fd013c080bf96b0f5ceec`, deployed with `cf` as Worker version `67121922-117d-441c-85bc-746219f50f3d`. The production build provisions a SQLite `MemoryAgent` Durable Object and the Workers AI binding. [Source CI](https://github.com/irvinebroque/omp-cloudflare/actions/runs/42496376555) repeats the full local suite.
+
+`npm run verify` passed all 21 unit tests, the production builds, the authenticated chat boundary (401/400/405), and the complete isolated local HTTP/MCP/Python/concurrency/regression suite. The anti-slop fixture check and production dependency audit also passed with zero reported vulnerabilities.
+
+Real Pi model checks passed against both the deployed Worker and the local app with `OMP_REMOTE_AI=true`. Each saved a randomly generated sample project preference through the actual `remember` tool, deduplicated a repeated submission, independently found exactly one OMP record, opened a fresh transcript, called search and read, recalled a random heading absent from the second prompt, reconnected, and checked store isolation. The samples were removed from current memory views; their Git history and Pi transcripts remain. The local run used local Artifacts/SQLite and remote Workers AI, not the deployed memory namespace. See [live evidence](validation/omp-pi-agent-validation.json) and [local evidence](validation/omp-pi-local-validation.json).
+
+The deployed browser also saved a sample preference, recalled it in a new Personal chat, and resumed that transcript after refresh and token re-entry. Its snapshot download contained the one memory and all 200 deletion markers. Importing it into Company reported one accepted memory, zero unchanged, and zero rejected. An independent HTTP read confirmed the full original record and origin; a fresh Company chat searched, read, and recalled it. The UI fit a 390-pixel viewport without horizontal overflow. The sample was then removed from both current stores, and the demo was left at a new chat. See [browser evidence](validation/omp-pi-browser-validation.json) and the [chat screenshot](images/demo.png).
+
+The earlier Deploy to Cloudflare button validation below covers the initial memory-service release. The Pi revision has additionally been deployed and tested through `cf`; a fresh button-created GitHub copy has not been repeated for this revision. The template metadata now declares the same AI and Durable Object bindings as the authoritative `cf` configuration.
 
 ## Reproduce the automated suite
 
@@ -34,7 +46,7 @@ The E2E runner uses fresh temporary Artifacts simulators and removes them afterw
 
 ## Deployment flow and live service
 
-The final application source is commit `020930194df2128d27ed1e98b7ffb21bb7e6c799`, deployed as Worker version `156397ab-3294-4e8a-a23d-3750630ec1b7`. Its [clean-install CI run](https://github.com/irvinebroque/omp-cloudflare/actions/runs/42494216167) passed all 21 unit tests and the complete E2E suite.
+The initial memory-service application source is commit `020930194df2128d27ed1e98b7ffb21bb7e6c799`, deployed as Worker version `156397ab-3294-4e8a-a23d-3750630ec1b7`. Its [clean-install CI run](https://github.com/irvinebroque/omp-cloudflare/actions/runs/42494216167) passed all 21 unit tests and the complete E2E suite.
 
 The request-isolation source is commit `35041044ad0efc34adf20bec9146741ef7dbdcbd`, deployed as Worker version `c151d6ef-b313-47ab-93ce-86b1e09a39ba`. Its [clean-install CI run](https://github.com/irvinebroque/omp-cloudflare/actions/runs/42494019596) exercises the additional concurrency suite.
 
@@ -61,7 +73,7 @@ These commands write disposable sample memories and retain their history. Run th
 
 ## Browser and real model checks
 
-The browser workflow was exercised against the local simulator and the live deployment: connect, save, search, read, conditional edit, download a snapshot, switch stores, upload that snapshot, inspect import receipts, and delete test content. A literal `<script>` string was rendered as text. The live page also fit a 390-pixel viewport without horizontal overflow.
+Before the Pi redesign, the memory-editor browser workflow was exercised against the local simulator and the live deployment: connect, save, search, read, conditional edit, download a snapshot, switch stores, upload that snapshot, inspect import receipts, and delete test content. A literal `<script>` string was rendered as text. The live page also fit a 390-pixel viewport without horizontal overflow.
 
 Codex CLI 0.162.1 setup was tested in an isolated home/config directory: repeated setup is idempotent, a fresh app-server process discovers all six MCP tools and the memory skill, and uninstall removes only the entries created by the setup command. The user's global Codex configuration was not changed.
 
