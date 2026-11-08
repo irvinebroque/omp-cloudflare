@@ -1,7 +1,56 @@
 # Contributing
 
-Start with the README’s local setup, then run `npm run verify` and `npm run test:quality`. Keep changes focused and include regression evidence when changing persistence, exchange, pagination, authentication or concurrency. The suite uses the real local Artifacts simulator and real MCP clients; module mocks are prohibited by lint.
+Use [Node 24.22.0](.node-version) and Python 3.10+.
 
-Preserve unknown metadata, original origins and import receipts. Update `docs/protocol.md` when an experimental contract changes. Update deployment discovery metadata together with `cloudflare.config.ts` and test a clean setup before documenting a new deployment path. Platform beta upgrades should include both local and live validation.
+```sh
+npm ci
+npm run dev
+```
 
-Never commit tokens, exported private memories, local Artifacts state or Cloudflare account IDs. Production deployments use a private runtime token; this example’s two stores share one operator. Report suspected security issues privately through GitHub’s security reporting feature when available, avoiding memory contents and credentials in public issues.
+This starts local memory APIs without credentials. For the chat agent, use the [local chat setup](README.md#run-locally).
+
+## Check a change
+
+```sh
+npm run verify
+npm run test:quality
+```
+
+`verify` runs strict checks, 21 unit tests, production builds, and the isolated HTTP/MCP/Python/concurrency/exchange suite. It needs no Cloudflare credentials. [Validation details](docs/validation.md).
+
+Include regression evidence when changing persistence, exchange, pagination, authentication, or concurrency. Tests use the real local simulator and MCP clients; module mocks are prohibited by lint.
+
+Preserve unknown metadata, original origins, and import receipts. Update `docs/protocol.md` when an experimental contract changes. Keep deployment discovery metadata and `cloudflare.config.ts` in sync, and test a clean setup before documenting a new deployment path. Platform beta upgrades need local and live validation.
+
+```sh
+npm run format  # format files
+npm run check   # formatting, lint, and types
+npm run build   # production build
+```
+
+Vite+ runs the formatter, lint, type checks, tests, builds, and TypeScript scripts. Cloudflare development and deployment use `cf`. Configuration lives in `vite.config.ts` and `cloudflare.config.ts`.
+
+[Dillon Mulroy’s anti-slop rules](https://github.com/dmmulroy/anti-slop) are enabled as errors. Keep strict settings and fix findings without suppressions. For rule updates, follow the [vendored skill](.agents/skills/install-anti-slop/SKILL.md) and preserve [provenance and licenses](tools/oxlint/anti-slop/UPSTREAM.md).
+
+## Find the code
+
+```text
+src/agent/       Pi harness and memory tools
+src/protocol/    Validation and exchange
+src/storage/     Artifacts storage and Git commits
+src/server/      HTTP, MCP, authentication, and routing
+src/web/         Browser chat UI
+sdk/             TypeScript clients
+examples/        Independent Python receiver/exporter
+scripts/         Deployment, setup, and verification
+codex/           MCP configuration and memory skill
+tests/           Unit tests
+```
+
+## Reset local data
+
+Stop the development server, then remove `.cloudflare/state`. This resets local memories and conversations. [Deployment configuration](docs/deployment.md) covers alternate state directories and ports.
+
+## Protect private data
+
+Never commit tokens, exported private memories, local state, or Cloudflare account IDs. Both stores share one access key. Report suspected security issues privately through GitHub's security reporting feature when available, keeping memory contents and credentials out of public issues.

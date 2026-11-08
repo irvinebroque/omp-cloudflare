@@ -50,6 +50,10 @@ MCP searches summaries, then retrieves selected full memories. Actual repository
 
 A version is a SHA-256 of canonical full memory JSON. It is an opaque optimistic-concurrency token, not the OMP draft’s version comparator. Git non-fast-forward rejection protects store writes; bounded retry reclones and reapplies operations. An `if_version` conflict survives retries and is returned to the client.
 
+## Limits
+
+This is a small, inspectable example: 100 active memories and 512 KiB of active JSON per store, 16 KiB per body, and 1 MiB per API request. Search is substring matching. Bodies are UTF-8 strings with valid MIME labels; binary transport is unsupported. Git history and tombstones grow over time.
+
 ## Unsupported
 
 No adopted reference designation, full-profile conformance, official manifest schema, secure forgetting, cryptographic provenance, multi-tenant authorization, binary memory transport, move transfers, vector retrieval, automatic agent hooks, transcripts, file attachments, or realtime synchronization is claimed.

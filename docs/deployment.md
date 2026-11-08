@@ -1,6 +1,46 @@
 # Deployment
 
-The CLI entry point is `npm run deploy`, which runs `scripts/deploy.ts` with Vite+’s TypeScript runner. It uses `cf` to inspect the Artifacts namespace, creates it only on an explicit not-found response, and deploys the Worker. Authentication/permission failures stop deployment rather than being mistaken for missing resources.
+For the deploy button, follow the [README steps](../README.md#deploy).
+
+## Deploy with cf
+
+From your checkout, using Node 24.22+ (24.x):
+
+```sh
+npm ci
+npx cf auth login
+openssl rand -hex 32
+```
+
+Save the printed key, then use it below:
+
+```sh
+export MEMORY_API_TOKEN=your-saved-key
+npm run deploy
+```
+
+Open the printed Worker URL and enter your saved key in **Connect → Access key**.
+
+The deploy command creates the required resources and preserves your existing data on subsequent deployments. If you omit `MEMORY_API_TOKEN` on a later deploy, it keeps the existing key. A first deployment needs a key.
+
+To check the deployed service:
+
+```sh
+export OMP_URL=https://your-worker.your-subdomain.workers.dev
+export OMP_API_TOKEN="$MEMORY_API_TOKEN"
+npm run roundtrip -- "$OMP_URL"
+npm run mcp:roundtrip -- "$OMP_URL"
+```
+
+These checks write and remove sample memories; their Git history remains.
+
+## Choose an account
+
+If `cf` asks you to choose an account, select the one you want to use. To select it explicitly, set this before running development or deployment:
+
+```sh
+export CLOUDFLARE_ACCOUNT_ID=your-account-id
+```
 
 ## Configuration
 
