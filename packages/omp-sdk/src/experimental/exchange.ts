@@ -2,7 +2,7 @@ import { z } from "zod";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import {
-  ApiError,
+  OmpError,
   jsonValue,
   label,
   timestampSchema,
@@ -103,7 +103,7 @@ export function archive(state: ExchangeSource, exportedAt = new Date().toISOStri
   });
 
   if (new Set(mapping.map((item) => item.exported_identifier)).size !== mapping.length)
-    throw new ApiError(409, "Export identity collision");
+    throw new OmpError("conflict", "Export identity collision");
 
   const identities = new Map(
     mapping.map((item) => [
@@ -124,7 +124,10 @@ export function archive(state: ExchangeSource, exportedAt = new Date().toISOStri
       identifier: text(identities.get(key(memory, state.origin)), "exported identifier"),
     };
     if (memory.checksum !== undefined && stable(memory) !== stable(rewritten))
-      throw new ApiError(409, "Cannot remap a checksummed memory; export its origin separately");
+      throw new OmpError(
+        "conflict",
+        "Cannot remap a checksummed memory; export its origin separately",
+      );
     return validateMemory(rewritten);
   });
 
@@ -138,7 +141,7 @@ export function archive(state: ExchangeSource, exportedAt = new Date().toISOStri
       intent: "copy",
       media_types: [...new Set(state.memories.map((memory) => memory.media_type))],
       x_omp_identity_map: mapping,
-      x_omp_reference_convention: "omp-cloudflare-references/0.1",
+      x_omp_reference_convention: "omp-references/0.1",
       x_omp_dangling_references: danglingReferences(memories, state.origin),
     },
     memories,
@@ -151,7 +154,7 @@ export function importedMemories(snapshot: Archive): Memory[] {
   const identifiers = new Set(snapshot.memories.map((memory) => memory.identifier));
 
   if (identifiers.size !== snapshot.memories.length)
-    throw new ApiError(400, "Duplicate identifiers in export");
+    throw new OmpError("invalid_input", "Duplicate identifiers in export");
   const mapping = snapshot.manifest.x_omp_identity_map;
 
   if (mapping === undefined)
@@ -173,7 +176,7 @@ export function importedMemories(snapshot: Archive): Memory[] {
     originalKeys.size !== mapping.length ||
     mapping.some((item) => !identifiers.has(item.exported_identifier))
   )
-    throw new ApiError(400, "Invalid export identity mapping");
+    throw new OmpError("invalid_input", "Invalid export identity mapping");
 
   return snapshot.memories.map((memory) => {
     const identity = byExport.get(memory.identifier);
@@ -182,7 +185,7 @@ export function importedMemories(snapshot: Archive): Memory[] {
       identity === undefined ||
       (memory.x_omp_origin !== undefined && memory.x_omp_origin !== identity.origin)
     )
-      throw new ApiError(400, "Inconsistent export identity mapping");
+      throw new OmpError("invalid_input", "Inconsistent export identity mapping");
 
     return {
       ...rewriteReferences(memory, (target) => byExport.get(target)?.identifier ?? target),

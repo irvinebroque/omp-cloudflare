@@ -1,7 +1,7 @@
 import { createRegistry, type ToolRegistration } from "@earendil-works/pi-durable";
 import { obj, opt, str } from "@earendil-works/pi-schema";
 import { objectSchema, type JsonInput } from "../protocol/model.ts";
-import { searchResponse } from "@omp-cloudflare/sdk/bindings/omp-cloudflare";
+import { searchResponse } from "../client/index.ts";
 import type { Store } from "../storage/artifacts.ts";
 import { route } from "../server/router.ts";
 

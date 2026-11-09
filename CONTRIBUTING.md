@@ -27,7 +27,7 @@ pnpm check   # formatting, lint, and types
 pnpm build   # production build
 ```
 
-Vite+ runs the formatter, lint, type checks, tests, builds, and TypeScript scripts. Cloudflare development and deployment use `cf`. Shared strict checks live in root `vite.config.ts`; app and SDK build configurations live in their package directories. Use `pnpm sdk:build` to build only the SDK. Root verification checks both packages and runs the app against their built public exports.
+Vite+ runs the formatter, lint, type checks, tests, builds, and TypeScript scripts. Cloudflare development and deployment use `cf`. Shared strict checks live in root `vite.config.ts`; app and SDK build configurations live in their package directories. Use `pnpm sdk:build` to build only the SDK. Root verification checks both packages and runs the app against the SDK’s built public exports. Keep the dependency one-way: the SDK owns portable data contracts and codecs; the app owns transport, storage and deployment policy. The SDK must build and pack without Cloudflare types or the app.
 
 Keep strict settings and fix findings without suppressions. Follow [Dillon Mulroy’s anti-slop guidance](https://github.com/dmmulroy/anti-slop); its custom plugin is not installed.
 
@@ -35,12 +35,12 @@ Keep strict settings and fix findings without suppressions. Follow [Dillon Mulro
 
 ```text
 packages/omp-sdk/src/core/          Portable types, validation and explicit provenance
-packages/omp-sdk/src/experimental/  Versioned exchange, references and runtime conventions
-packages/omp-sdk/src/bindings/      Implementation-specific HTTP client and contracts
+packages/omp-sdk/src/experimental/  Experimental exchange, references and Markdown loading
 packages/omp-sdk/src/testing/       Shared conformance fixtures
 packages/omp-sdk/tests/             Tests against built public package exports
+apps/cloudflare/src/client/        Implementation-specific HTTP client and contracts
 apps/cloudflare/src/agent/         Pi harness and memory tools
-apps/cloudflare/src/protocol/      Application quotas, migration and mutation policy
+apps/cloudflare/src/protocol/      Quotas, activation, migration, mutation policy and HTTP errors
 apps/cloudflare/src/storage/       Artifacts storage and Git commits
 apps/cloudflare/src/server/        HTTP, MCP, authentication and routing
 apps/cloudflare/src/web/           Browser chat UI

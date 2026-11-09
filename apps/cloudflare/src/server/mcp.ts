@@ -1,7 +1,8 @@
+import { apiError } from "../protocol/errors.ts";
 import { McpServer } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
-import { ApiError, objectSchema, type JsonInput, type Memory } from "../protocol/model.ts";
+import { objectSchema, type JsonInput, type Memory } from "../protocol/model.ts";
 import { memoryVersion } from "../protocol/runtime.ts";
 import {
   decodeResponse,
@@ -10,7 +11,7 @@ import {
   readResponse,
   savedResponse,
   deletedResponse,
-} from "@omp-cloudflare/sdk/bindings/omp-cloudflare";
+} from "../client/index.ts";
 
 export type Api = (request: Request) => Promise<Response>;
 
@@ -99,9 +100,10 @@ async function run(operation: () => Promise<Record<string, JsonInput>>) {
   try {
     return result(await operation());
   } catch (error) {
-    const status = error instanceof ApiError ? error.status : 503;
+    const failure = apiError(error);
+    const status = failure?.status ?? 503;
 
-    if (!(error instanceof ApiError))
+    if (failure === undefined)
       console.error(
         JSON.stringify({
           event: "mcp_operation_failed",
@@ -112,7 +114,7 @@ async function run(operation: () => Promise<Record<string, JsonInput>>) {
     return {
       isError: true,
       ...result({
-        error: error instanceof ApiError ? error.message : "Memory store unavailable",
+        error: failure?.message ?? "Memory store unavailable",
         status,
         retry:
           status === 409

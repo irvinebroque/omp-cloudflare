@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { OmpClient } from "@omp-cloudflare/sdk/bindings/omp-cloudflare";
+import { OmpClient } from "../src/client/index.ts";
 import { ApiError } from "../src/protocol/model.ts";
 
 const base = process.argv[2] ?? "http://localhost:5173";

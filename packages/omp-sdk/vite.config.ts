@@ -5,7 +5,7 @@ export default defineConfig({
     entry: {
       core: "src/core/index.ts",
       experimental: "src/experimental/index.ts",
-      "bindings/omp-cloudflare": "src/bindings/omp-cloudflare.ts",
+      "experimental/markdown": "src/experimental/markdown.ts",
       testing: "src/testing/index.ts",
     },
     platform: "neutral",

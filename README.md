@@ -119,14 +119,24 @@ Connect an MCP-capable agent to `https://<your-worker>/mcp` using `Authorization
 
 Select **Export** under **Memories**, connect to another store or deployment, then **Import** the file. The copy preserves original identity, provenance and custom metadata; repeated imports are idempotent. Export includes deletion markers to prevent stale copies from resurrecting deleted records.
 
-The [TypeScript SDK](packages/omp-sdk) provides portable validation, experimental exchange helpers and this server's HTTP client. Use it independently of the chat UI to build another client or memory integration.
+The provider-neutral [TypeScript SDK](packages/omp-sdk) provides memory validation, experimental exchange helpers and progressive Markdown loading. The [Cloudflare app](apps/cloudflare) owns this server’s HTTP client, routes, authentication and storage.
+
+### Export a portable Markdown directory
+
+Set `OMP_API_TOKEN` to the app’s access key, then export into a new directory:
+
+```sh
+pnpm memory:markdown https://your-worker.workers.dev "$PWD/memory-markdown" personal
+```
+
+Start with `memory-markdown/MEMORY.md`. Each directory summarizes its immediate children; the SDK loads selected bodies and metadata only when requested. JSON sidecars retain original identities, provenance, custom fields and the deletion ledger. Keep all generated files together. This experimental exchange projection is separate from the raw Artifacts Git checkout above. See the [SDK API and format](packages/omp-sdk#export-and-load-markdown-progressively).
 
 ## Workspace
 
 This pnpm monorepo contains two packages:
 
-- [`packages/omp-sdk`](packages/omp-sdk): `@omp-cloudflare/sdk`, with portable types and validation, experimental exchange/reference helpers, the example's HTTP binding, and shared test fixtures. It builds ESM JavaScript and TypeScript declarations.
-- [`apps/cloudflare`](apps/cloudflare): the Worker, Artifacts storage, MCP server and Pi chat demo. It consumes the SDK through `workspace:*`.
+- [`packages/omp-sdk`](packages/omp-sdk): `omp-sdk`, with provider-neutral types, validation, experimental exchange/reference helpers, Markdown projection/loading and shared test fixtures. It builds ESM JavaScript and TypeScript declarations with no Cloudflare or Node dependencies.
+- [`apps/cloudflare`](apps/cloudflare): the Worker, Artifacts storage, HTTP client/contracts, MCP server, runtime activation policy and Pi chat demo. It consumes the SDK through `workspace:*`; the SDK has no dependency on the app.
 
 Use the pinned pnpm version in `package.json` (install it with `corepack enable` if needed). Root commands build the SDK before starting or building the app. The SDK is built locally; this does not publish it to a registry.
 

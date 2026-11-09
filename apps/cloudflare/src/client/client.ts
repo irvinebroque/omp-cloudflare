@@ -1,6 +1,7 @@
 import type { z } from "zod";
-import type { JsonInput, Memory } from "../core/index.ts";
-import type { Archive, Context } from "../experimental/index.ts";
+import type { JsonInput, Memory } from "omp-sdk/core";
+import type { Archive } from "omp-sdk/experimental";
+import type { Context } from "../protocol/context.ts";
 import {
   decodeResponse,
   requestOptions,

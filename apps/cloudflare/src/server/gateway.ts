@@ -1,11 +1,11 @@
 import type { z } from "zod";
 import { ApiError, objectSchema, type JsonInput, type Memory } from "../protocol/model.ts";
 import { read, STORES, type Store } from "../storage/artifacts.ts";
-import type { gatewaySearchResponse } from "@omp-cloudflare/sdk/bindings/omp-cloudflare";
-import { storeSchema } from "@omp-cloudflare/sdk/bindings/omp-cloudflare";
+import type { gatewaySearchResponse } from "../client/index.ts";
+import { storeSchema } from "../client/index.ts";
 import { pageInput, paginate } from "../protocol/pagination.ts";
 import { applicable, validateContext } from "../protocol/runtime.ts";
-import { currentMemories, danglingReferences } from "@omp-cloudflare/sdk/experimental";
+import { currentMemories, danglingReferences } from "omp-sdk/experimental";
 
 export type GatewayHit = z.infer<typeof gatewaySearchResponse>["memories"][number];
 

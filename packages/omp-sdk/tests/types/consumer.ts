@@ -1,7 +1,6 @@
-import { memorySchema, appendContribution, type Memory } from "@omp-cloudflare/sdk/core";
-import { archive, importedMemories } from "@omp-cloudflare/sdk/experimental";
-import { OmpClient, OmpGateway } from "@omp-cloudflare/sdk/bindings/omp-cloudflare";
-import { collisionMemories } from "@omp-cloudflare/sdk/testing";
+import { memorySchema, appendContribution, type Memory } from "omp-sdk/core";
+import { archive, importedMemories } from "omp-sdk/experimental";
+import { collisionMemories } from "omp-sdk/testing";
 
 const memory: Memory = memorySchema.parse({
   identifier: "consumer",
@@ -19,8 +18,15 @@ const snapshot = archive({
   memories: [attributed, ...collisionMemories()],
   tombstones: [],
 });
-console.log(
-  importedMemories(snapshot).length,
-  new OmpClient("https://example.invalid"),
-  new OmpGateway("https://example.invalid"),
-);
+console.log(importedMemories(snapshot).length);
+
+import { exportMarkdown, openMarkdownDirectory } from "omp-sdk/experimental/markdown";
+const { files } = exportMarkdown(snapshot);
+const directory = await openMarkdownDirectory({
+  readFile: async (path) => {
+    const value = files.get(path);
+    if (value === undefined) throw new Error("Missing file");
+    return value;
+  },
+});
+console.log(await directory.readRoot(), await directory.list(), await directory.snapshot());

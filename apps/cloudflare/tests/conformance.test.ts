@@ -1,8 +1,4 @@
-import {
-  referenceMemory,
-  invalidMemoryPatches,
-  collisionMemories,
-} from "@omp-cloudflare/sdk/testing";
+import { referenceMemory, invalidMemoryPatches, collisionMemories } from "omp-sdk/testing";
 import { describe, expect, it } from "vite-plus/test";
 import {
   objectSchema,
@@ -15,7 +11,7 @@ import {
   type Memory,
 } from "../src/protocol/model.ts";
 import { assertNoCredentials } from "../src/protocol/credentials.ts";
-import { currentMemories, danglingReferences } from "@omp-cloudflare/sdk/experimental";
+import { currentMemories, danglingReferences } from "omp-sdk/experimental";
 
 const memory = referenceMemory;
 

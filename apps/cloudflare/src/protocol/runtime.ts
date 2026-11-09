@@ -1,7 +1,8 @@
+import { ApiError } from "./errors.ts";
 import { createHash } from "node:crypto";
-import { appendContribution, ApiError, stable, type Memory } from "@omp-cloudflare/sdk/core";
+import { appendContribution, stable, type Memory } from "omp-sdk/core";
 import { text, type State } from "./model.ts";
-export { applicable, validateContext, validateConventions } from "@omp-cloudflare/sdk/experimental";
+export { applicable, validateContext, validateConventions } from "./context.ts";
 
 /** An opaque per-memory optimistic-concurrency token, not a portable OMP comparator. */
 export const memoryVersion = (memory: Memory) =>

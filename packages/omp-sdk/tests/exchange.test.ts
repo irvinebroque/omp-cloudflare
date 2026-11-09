@@ -5,8 +5,8 @@ import {
   importedMemories,
   danglingReferences,
   currentMemories,
-} from "@omp-cloudflare/sdk/experimental";
-import { collisionMemories, referenceMemory } from "@omp-cloudflare/sdk/testing";
+} from "omp-sdk/experimental";
+import { collisionMemories, referenceMemory } from "omp-sdk/testing";
 
 it("round trips mixed origins through the public experimental envelope without losing references", () => {
   const memories = collisionMemories();
@@ -25,7 +25,9 @@ it("round trips mixed origins through the public experimental envelope without l
 it("preserves unknown manifest extensions and rejects corrupt identity maps", () => {
   const snapshot = archive({ origin: "source", memories: [referenceMemory], tombstones: [] });
   snapshot.manifest.custom = { nested: [true, null] };
+  snapshot.manifest.x_omp_reference_convention = "omp-cloudflare-references/0.1";
   expect(archiveSchema.parse(snapshot).manifest.custom).toEqual({ nested: [true, null] });
+  expect(importedMemories(archiveSchema.parse(snapshot))).toEqual([referenceMemory]);
   snapshot.manifest.x_omp_identity_map = [];
   expect(() => importedMemories(snapshot)).toThrow("Invalid export identity mapping");
 });

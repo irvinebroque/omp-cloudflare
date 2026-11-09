@@ -14,7 +14,7 @@ Older versions could store malformed standard metadata. Loading an existing stor
 
 ## References and exchange
 
-The local `omp-cloudflare-references/0.1` convention recognizes `{target, origin?}` objects in links and evidence and exact `[[identifier]]` references in plain text or Markdown. A `target` is an opaque memory identifier, including when it contains colons. External sources can use `{uri: "https://..."}`; free-form evidence strings and other object shapes remain opaque. These conventions are experimental, not adopted OMP syntax.
+The experimental `omp-references/0.1` convention (previously named `omp-cloudflare-references/0.1`) recognizes `{target, origin?}` objects in links and evidence and exact `[[identifier]]` references in plain text or Markdown. A `target` is an opaque memory identifier, including when it contains colons. External sources can use `{uri: "https://..."}`; free-form evidence strings and other object shapes remain opaque. These conventions are experimental, not adopted OMP syntax.
 
 Missing recognized targets are retained. HTTP reads/searches and MCP results expose `dangling_references`; export exposes `manifest.x_omp_dangling_references`. These diagnostics are computed separately, so resolving a target does not rewrite the source record or invalidate its concurrency token.
 
@@ -22,14 +22,20 @@ Exports keep identifiers unique when several origins contain the same identifier
 
 The supported exchange intent is `copy`, with `minimal` snapshots or selections. Absence never deletes data. Import provides receipts and preserves original identities across retries. Each HTTP export page is labelled `selection` and carries `x_omp_pagination` metadata. Collect every page against the same commit before treating the result as a snapshot. The bundled client and browser exporter do so and remove the pagination marker when complete. A page alone must not be treated as a complete deletion ledger. Tombstone transfer is incremental, rather than an atomic cross-store transaction.
 
+## Markdown directory loading
+
+The provider-neutral SDK implements the draft’s §10.2 loading pattern through `exportMarkdown` and `openMarkdownDirectory`: root `MEMORY.md`, immediate-child summaries, deferred deeper indexes/bodies and selective reads. Full JSON metadata is carried in sidecars; original `memory.path` remains distinct from the projection filename. The experimental `omp-markdown/0.1` encoding declares `losses: []` and reconstructs the original supported copy envelope, including identities and tombstones. Keep all sidecars when transferring it.
+
+The draft leaves the concrete Markdown encoding open. This repository’s index/sidecar names are a local proposal, not finalized interoperable syntax. The HTTP API continues advertising its minimal copy binding; `pnpm memory:markdown` composes its paginated snapshot with the SDK projection. It does not add Markdown upload routes, local edit reconciliation or synchronization. [API and format details](packages/omp-sdk#export-and-load-markdown-progressively).
+
 ## Credentials and supported profiles
 
 Write, update, import and export boundaries reject recognizable credential fields, labelled password/key assignments, common key formats, private-key material, credential-bearing URLs and the deployment access key. Rejections do not echo the credential. Export also checks existing records. This is a deterministic rejection policy, not a universal classifier: arbitrary unlabelled secrets can resemble ordinary text. Do not submit secrets as memory. The policy rejects a whole operation rather than silently redacting unknown metadata.
 
-Audit, secure forgetting, ACL enforcement, Markdown directory loading, moves, automatic hooks and real-time sync remain unsupported. The personal/company stores share one operator token. Git history provides persistence and revision inspection; it does not by itself establish the audit profile or erasure guarantees.
+Audit, secure forgetting, ACL enforcement, moves, automatic hooks and real-time sync remain unsupported. The personal/company stores share one operator token. Git history provides persistence and revision inspection; it does not by itself establish the audit profile or erasure guarantees.
 
 ## Verification
 
 `pnpm verify` includes strict checks, unit tests, builds and isolated HTTP/MCP/concurrency/exchange tests. The `conformance:roundtrip` script adds regression checks for malformed metadata, provenance, lifecycle, dangling references, credential rejection and export completeness. These checks verify this implementation's supported contract; they are not an official OMP certification suite.
 
-The reusable implementation lives in [`packages/omp-sdk`](packages/omp-sdk). Core validation is independent of this deployment’s quotas and credential policy. Exchange/reference/runtime conventions and the Cloudflare HTTP binding have separate package entry points, so consumers can distinguish them from the draft memory schema.
+The reusable implementation lives in [`packages/omp-sdk`](packages/omp-sdk). Core validation is independent of this deployment’s quotas and credential policy. Exchange/reference and Markdown conventions have experimental package entry points. Cloudflare HTTP contracts, runtime activation policy and HTTP status mapping live entirely in the app. Older envelopes keep their convention tags on import; identity maps and unknown manifest metadata remain accepted.

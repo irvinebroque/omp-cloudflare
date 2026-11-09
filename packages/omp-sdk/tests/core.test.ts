@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
-import { appendContribution, memorySchema, objectSchema, stable } from "@omp-cloudflare/sdk/core";
-import { referenceMemory, invalidMemoryPatches } from "@omp-cloudflare/sdk/testing";
+import { appendContribution, memorySchema, objectSchema, stable } from "omp-sdk/core";
+import { referenceMemory, invalidMemoryPatches } from "omp-sdk/testing";
 
 describe("public portable memory contract", () => {
   it("rejects malformed draft metadata and preserves extensions", () => {

@@ -1,3 +1,4 @@
+import { apiError } from "./protocol/errors.ts";
 import { ApiError } from "./protocol/model.ts";
 import { authorize } from "./server/auth.ts";
 import { handleMcp } from "./server/mcp.ts";
@@ -40,9 +41,10 @@ export default {
 
       return await route(request, env);
     } catch (error) {
-      const status = error instanceof ApiError ? error.status : 503;
+      const failure = apiError(error);
+      const status = failure?.status ?? 503;
 
-      if (!(error instanceof ApiError))
+      if (failure === undefined)
         console.error(
           JSON.stringify({
             event: "request_failed",
@@ -55,7 +57,7 @@ export default {
       if (status === 401) headers.set("www-authenticate", "Bearer");
 
       return Response.json(
-        { error: error instanceof ApiError ? error.message : "Storage operation failed" },
+        { error: failure?.message ?? "Storage operation failed" },
         { status, headers },
       );
     }

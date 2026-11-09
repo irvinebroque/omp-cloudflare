@@ -9,7 +9,7 @@ import {
   type State,
 } from "../src/protocol/model.ts";
 import { memoryVersion } from "../src/protocol/runtime.ts";
-import { applicable, repositoryKey, relativePath } from "@omp-cloudflare/sdk/experimental";
+import { applicable, repositoryKey, relativePath } from "../src/protocol/context.ts";
 import { authorize } from "../src/server/auth.ts";
 
 it("fails closed for an absent secret or the former example placeholder", () => {

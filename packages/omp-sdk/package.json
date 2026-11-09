@@ -1,5 +1,5 @@
 {
-  "name": "@omp-cloudflare/sdk",
+  "name": "omp-sdk",
   "version": "0.1.0",
   "description": "Experimental TypeScript utilities for the OMP v0.5 editors draft",
   "license": "Apache-2.0",
@@ -24,13 +24,13 @@
       "types": "./dist/experimental.d.ts",
       "import": "./dist/experimental.js"
     },
-    "./bindings/omp-cloudflare": {
-      "types": "./dist/bindings/omp-cloudflare.d.ts",
-      "import": "./dist/bindings/omp-cloudflare.js"
-    },
     "./testing": {
       "types": "./dist/testing.d.ts",
       "import": "./dist/testing.js"
+    },
+    "./experimental/markdown": {
+      "types": "./dist/experimental/markdown.d.ts",
+      "import": "./dist/experimental/markdown.js"
     }
   },
   "scripts": {
@@ -40,11 +40,9 @@
   },
   "dependencies": {
     "@noble/hashes": "^2.4.0",
-    "picomatch": "^4.0.7",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/picomatch": "^4.0.3",
     "typescript": "^7.0.2",
     "vite-plus": "1.5.0"
   },

@@ -1,6 +1,7 @@
+import { ApiError } from "../protocol/errors.ts";
 import { z } from "zod";
-import { memorySchema, objectSchema, ApiError, type JsonInput } from "../core/index.ts";
-import { archiveSchema, receiptSchema, tombstoneSchema } from "../experimental/index.ts";
+import { memorySchema, objectSchema, type JsonInput } from "omp-sdk/core";
+import { archiveSchema, receiptSchema, tombstoneSchema } from "omp-sdk/experimental";
 
 export const storeSchema = z.enum(["personal", "company"]);
 

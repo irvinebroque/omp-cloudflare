@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { z } from "zod";
-import { OmpClient, OmpGateway, type Store } from "@omp-cloudflare/sdk/bindings/omp-cloudflare";
+import { OmpClient, OmpGateway, type Store } from "../src/client/index.ts";
 import { ApiError, archive, type JsonInput, type Memory } from "../src/protocol/model.ts";
-import { readResponse } from "@omp-cloudflare/sdk/bindings/omp-cloudflare";
+import { readResponse } from "../src/client/index.ts";
 
 const base = process.argv[2] ?? "http://localhost:5173";
 const personal = new OmpClient(base, "personal", process.env.OMP_API_TOKEN ?? "");

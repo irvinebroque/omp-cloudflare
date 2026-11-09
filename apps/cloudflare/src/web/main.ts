@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { memorySchema, type JsonInput } from "@omp-cloudflare/sdk/core";
-import { archiveSchema } from "@omp-cloudflare/sdk/experimental";
-import { OmpClient, storeSchema } from "@omp-cloudflare/sdk/bindings/omp-cloudflare";
+import { memorySchema, type JsonInput } from "omp-sdk/core";
+import { archiveSchema } from "omp-sdk/experimental";
+import { OmpClient, storeSchema } from "../client/index.ts";
 import { chatView, type ChatView } from "../agent/contracts.ts";
 
 const json = z.json();

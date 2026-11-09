@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { jsonValue, objectSchema, type Json, type JsonInput } from "./json.ts";
-import { ApiError } from "./errors.ts";
+import { OmpError } from "./errors.ts";
 
 export const timestampSchema = z.iso.datetime({ offset: true });
 
@@ -70,7 +70,7 @@ export type Memory = z.infer<typeof memorySchema>;
 export function object(value: JsonInput) {
   const result = objectSchema.safeParse(value);
 
-  if (!result.success) throw new ApiError(400, "Expected a JSON object");
+  if (!result.success) throw new OmpError("invalid_input", "Expected a JSON object");
 
   return result.data;
 }
@@ -84,7 +84,10 @@ export function text(value: JsonInput, name: string, max = Number.MAX_SAFE_INTEG
     .safeParse(value);
 
   if (!result.success)
-    throw new ApiError(400, name + " must be a nonempty string of at most " + max + " characters");
+    throw new OmpError(
+      "invalid_input",
+      name + " must be a nonempty string of at most " + max + " characters",
+    );
 
   return result.data;
 }
@@ -92,7 +95,7 @@ export function text(value: JsonInput, name: string, max = Number.MAX_SAFE_INTEG
 export function validateMemory(value: JsonInput): Memory {
   const result = memorySchema.safeParse(value);
 
-  if (!result.success) throw new ApiError(400, z.prettifyError(result.error));
+  if (!result.success) throw new OmpError("invalid_input", z.prettifyError(result.error));
 
   return result.data;
 }

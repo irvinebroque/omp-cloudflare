@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { openMarkdownDirectory } from "omp-sdk/experimental/markdown";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as pause } from "node:timers/promises";
 import { ApiError } from "../src/protocol/model.ts";
-import { OmpClient } from "@omp-cloudflare/sdk/bindings/omp-cloudflare";
+import { OmpClient } from "../src/client/index.ts";
 
 const temporary = await mkdtemp(join(tmpdir(), "omp-e2e-"));
 const port = process.env.OMP_E2E_PORT ?? "5191";
@@ -150,8 +151,28 @@ try {
   await run("pnpm", ["run", "regression:roundtrip", base], env);
   await run("pnpm", ["run", "concurrency:roundtrip", base], env);
   await run("pnpm", ["run", "conformance:roundtrip", base], env);
+  const markdownCanary = await client.remember({
+    identifier: "markdown-canary",
+    media_type: "text/markdown",
+    path: "projects/widget.md",
+    body: "Selectively loaded Markdown body",
+    custom: { nested: [true, null, 42] },
+  });
   const fullSnapshot = await client.snapshot();
   assert.ok(fullSnapshot.tombstones.length >= 51);
+  const markdownOutput = join(temporary, "markdown-export");
+  await run("pnpm", ["run", "memory:markdown", base, markdownOutput], env);
+  const directory = await openMarkdownDirectory({
+    readFile: (path) => readFile(join(markdownOutput, path), "utf8"),
+  });
+  assert.match(await directory.readRoot(), /^# Memory/u);
+  assert.deepEqual((await directory.read("projects/widget.md")).memory, markdownCanary.memory);
+  const markdownSnapshot = await directory.snapshot();
+  assert.deepEqual(markdownSnapshot.memories, fullSnapshot.memories);
+  assert.deepEqual(markdownSnapshot.tombstones, fullSnapshot.tombstones);
+  console.log(
+    "PASS HTTP snapshot → Markdown files → provider-neutral loader, including tombstones",
+  );
   await stop();
   await start(join(temporary, "second"));
 
@@ -163,7 +184,8 @@ try {
   assert.notEqual(independent.memory.x_omp_origin, origin);
   assert.equal((await client.import(snapshot)).receipts[0]?.status, "accepted");
   assert.deepEqual((await client.read("restart-canary")).memory, saved.memory);
-  await client.importSnapshot(fullSnapshot);
+  await client.importSnapshot(markdownSnapshot);
+  assert.deepEqual((await client.read("markdown-canary")).memory, markdownCanary.memory);
   await assert.rejects(
     () => client.read("restart-canary"),
     (error: Error) => error instanceof ApiError && error.status === 404,

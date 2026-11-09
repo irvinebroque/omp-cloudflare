@@ -32,7 +32,7 @@ import {
   validateConventions,
 } from "../protocol/runtime.ts";
 import { z } from "zod";
-import { currentMemories, danglingReferences } from "@omp-cloudflare/sdk/experimental";
+import { currentMemories, danglingReferences } from "omp-sdk/experimental";
 import { assertNoCredentials } from "../protocol/credentials.ts";
 
 const json = (value: JsonInput, status = 200) =>
@@ -87,7 +87,7 @@ export async function route(request: Request, env: Env): Promise<Response> {
       stores: STORES,
       gateway: "/gateway/info",
       namespace: "deployment-specific",
-      reference_convention: "omp-cloudflare-references/0.1",
+      reference_convention: "omp-references/0.1",
       credential_policy:
         "Reject recognizable credential fields, assignments, key formats and the deployment access key. Arbitrary unlabelled secrets cannot be identified reliably.",
       storage: "Cloudflare Artifacts Git repositories",

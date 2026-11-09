@@ -1,5 +1,5 @@
-import type { JsonInput } from "@omp-cloudflare/sdk/core";
-import { ApiError } from "@omp-cloudflare/sdk/core";
+import { ApiError } from "./errors.ts";
+import type { JsonInput } from "omp-sdk/core";
 
 const credentialKey =
   /^(?:password|passwd|api[_-]?key|access[_-]?token|refresh[_-]?token|auth(?:orization)?[_-]?token|client[_-]?secret|private[_-]?key|secret[_-]?key)$/iu;

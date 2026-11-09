@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { OmpClient, OmpGateway } from "@omp-cloudflare/sdk/bindings/omp-cloudflare";
+import { OmpClient, OmpGateway } from "../src/client/index.ts";
 
 const base = process.argv[2];
 

@@ -1,6 +1,7 @@
+import { ApiError } from "./errors.ts";
 import picomatch from "picomatch";
 import { z } from "zod";
-import { ApiError, type JsonInput, type Memory } from "../core/index.ts";
+import { type JsonInput, type Memory } from "omp-sdk/core";
 
 /** Local experimental conventions inspired by issue #22; not a settled OMP schema. */
 export const contextSchema = z.object({

@@ -11,10 +11,10 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm sdk:build && pnpm --filter omp-cloudflare dev",
-    "sdk:build": "pnpm --filter @omp-cloudflare/sdk build",
+    "sdk:build": "pnpm --filter omp-sdk build",
     "build": "pnpm sdk:build && pnpm --filter omp-cloudflare build",
     "deploy": "pnpm sdk:build && pnpm --filter omp-cloudflare run deploy",
-    "check": "pnpm sdk:build && pnpm --filter omp-cloudflare check && vp check --deny-warnings && pnpm --filter @omp-cloudflare/sdk check",
+    "check": "pnpm sdk:build && pnpm --filter omp-cloudflare check && vp check --deny-warnings && pnpm --filter omp-sdk check",
     "lint": "vp lint --deny-warnings",
     "lint:fix": "vp lint --fix",
     "format": "vp fmt",
@@ -26,7 +26,8 @@
     "regression:roundtrip": "pnpm --filter omp-cloudflare regression:roundtrip",
     "concurrency:roundtrip": "pnpm --filter omp-cloudflare concurrency:roundtrip",
     "conformance:roundtrip": "pnpm --filter omp-cloudflare conformance:roundtrip",
-    "agent:roundtrip": "pnpm --filter omp-cloudflare agent:roundtrip"
+    "agent:roundtrip": "pnpm --filter omp-cloudflare agent:roundtrip",
+    "memory:markdown": "pnpm sdk:build && pnpm --filter omp-cloudflare memory:markdown"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

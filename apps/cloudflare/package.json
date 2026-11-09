@@ -20,7 +20,8 @@
     "concurrency:roundtrip": "vpx scripts/concurrency-roundtrip.ts",
     "conformance:roundtrip": "vpx scripts/conformance-roundtrip.ts",
     "agent:roundtrip": "vpx scripts/agent-roundtrip.ts",
-    "check": "cf workers types && tsc --noEmit && tsc -p src/web"
+    "check": "cf workers types && tsc --noEmit && tsc -p src/web",
+    "memory:markdown": "vpx scripts/export-markdown.ts"
   },
   "dependencies": {
     "@earendil-works/chord": "~1.5.0",
@@ -28,16 +29,18 @@
     "@earendil-works/pi-durable": "~1.5.0",
     "@earendil-works/pi-schema": "~1.5.0",
     "@modelcontextprotocol/server": "2.4.0",
-    "@omp-cloudflare/sdk": "workspace:*",
     "agents": "0.33.0",
     "isomorphic-git": "1.44.11",
     "memfs": "^4.80.0",
+    "omp-sdk": "workspace:*",
+    "picomatch": "^4.0.7",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "beta",
     "@modelcontextprotocol/client": "2.4.0",
     "@types/node": "^26.6.6",
+    "@types/picomatch": "^4.0.3",
     "cf": "^1.0.0-beta.17",
     "json5": "2.2.3",
     "typescript": "^7.0.2",

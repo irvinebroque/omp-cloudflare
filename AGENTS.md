@@ -10,4 +10,6 @@ Protocol behavior follows the OMP editors’ draft linked in the README. Preserv
 
 Run `pnpm verify` before pushing. E2E uses isolated local state. Live checks write disposable sample records and retain content in Git history; run only against an account you are authorized to use. Record live/browser/model checks accurately in the pull request; do not claim a deploy-button success from a successful CLI deployment alone.
 
-This is a pnpm workspace. `packages/omp-sdk` contains portable protocol utilities and explicit experimental/binding entry points; `apps/cloudflare` owns storage, authentication, migration, deployment quotas and credential policy. Consume SDK public package exports via `workspace:*`, never relative imports into its source. Build the SDK before running consumers directly.
+This is a pnpm workspace. `packages/omp-sdk` contains provider-neutral protocol utilities and explicit experimental entry points; `apps/cloudflare` owns storage, authentication, HTTP clients/contracts/status mapping, runtime activation, migration, deployment quotas and credential policy. Consume SDK public package exports via `workspace:*`, never relative imports into its source. Build the SDK before running consumers directly.
+
+Keep the dependency one-way: the SDK must not import the app, Cloudflare bindings, Node built-ins, or implementation HTTP routes. Markdown storage is supplied by caller-owned read/write adapters. Do not promote experimental encoding/convention choices into adopted protocol requirements.

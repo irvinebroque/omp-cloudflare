@@ -1,7 +1,7 @@
+import { ApiError } from "./errors.ts";
 import { z } from "zod";
 import {
   memorySchema as portableMemorySchema,
-  ApiError,
   contributorSchema,
   timestampSchema,
   label as portableLabel,
@@ -12,7 +12,7 @@ import {
   text as portableText,
   type JsonInput,
   type Memory,
-} from "@omp-cloudflare/sdk/core";
+} from "omp-sdk/core";
 import {
   archive as createArchive,
   archiveSchema as portableArchiveSchema,
@@ -20,17 +20,17 @@ import {
   type Archive,
   type Receipt,
   type Tombstone,
-} from "@omp-cloudflare/sdk/experimental";
+} from "omp-sdk/experimental";
 import { assertNoCredentials } from "./credentials.ts";
 
-export * from "@omp-cloudflare/sdk/core";
+export * from "omp-sdk/core";
 export {
   importedMemories,
   type Archive,
   type Receipt,
   type Tombstone,
   tombstoneSchema,
-} from "@omp-cloudflare/sdk/experimental";
+} from "omp-sdk/experimental";
 
 const label = portableLabel.max(256);
 export const text = (value: JsonInput, name: string, max = 256) => portableText(value, name, max);
@@ -194,3 +194,5 @@ export function archive(state: State): Archive {
     },
   };
 }
+
+export { ApiError } from "./errors.ts";

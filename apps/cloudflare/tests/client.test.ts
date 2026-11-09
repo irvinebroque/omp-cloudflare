@@ -1,5 +1,5 @@
 import { expect, it } from "vite-plus/test";
-import { decodeResponse, gatewayInfoResponse } from "@omp-cloudflare/sdk/bindings/omp-cloudflare";
+import { decodeResponse, gatewayInfoResponse } from "../src/client/index.ts";
 
 it("reports an upstream HTML failure with its HTTP status instead of a JSON syntax error", async () => {
   await expect(
