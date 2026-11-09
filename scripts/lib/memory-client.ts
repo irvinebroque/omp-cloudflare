@@ -49,8 +49,8 @@ export class OmpClient {
   remember(memory: MemoryInput) {
     return this.request("fmp/upload/inferences", savedResponse, { memory });
   }
-  read(identifier: string, origin?: string) {
-    return this.request("fmp/read", readResponse, { identifier, origin });
+  read(identifier: string, origin?: string, include_inactive = false) {
+    return this.request("fmp/read", readResponse, { identifier, origin, include_inactive });
   }
   search(query: string, limit = 20, cursor?: string) {
     return this.request("fmp/search", searchResponse, { query, limit, cursor });
@@ -80,8 +80,8 @@ export class OmpClient {
 
     await append(first.next_cursor);
     const { next_cursor: _cursor, storage: _storage, ...snapshot } = first;
-
-    return snapshot;
+    const { x_omp_pagination: _pagination, ...manifest } = snapshot.manifest;
+    return { ...snapshot, manifest: { ...manifest, selection: "snapshot" as const } };
   }
   /** Split a collected snapshot into bounded requests, retaining per-memory receipts. */
   async importSnapshot(snapshot: Archive) {

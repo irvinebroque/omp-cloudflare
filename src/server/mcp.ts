@@ -200,11 +200,12 @@ export function createServer(api: Api, base: URL): McpServer {
 
         return {
           ...data,
-          memories: data.memories.map(({ store, memory }) => ({
+          memories: data.memories.map(({ store, memory, dangling_references }) => ({
             ref: reference(store, memory),
             version: memoryVersion(memory),
             stub: memory.stub,
             evidence: memory.evidence,
+            dangling_references,
             title: memory.title,
             snippet: memory.body.slice(0, 240),
             applies_to: memory.applies_to,
@@ -228,7 +229,10 @@ export function createServer(api: Api, base: URL): McpServer {
       run(async () => {
         const data = await call("/gateway/fmp/read", readResponse, args);
 
-        return project(args.store, data.memory);
+        return {
+          ...project(args.store, data.memory),
+          dangling_references: data.dangling_references,
+        };
       }),
   );
   server.registerTool(

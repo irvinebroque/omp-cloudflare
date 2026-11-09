@@ -15,7 +15,7 @@ This starts local memory APIs without credentials. For the chat agent, use the [
 npm run verify
 ```
 
-`verify` runs strict checks, 21 unit tests, production builds, and the isolated HTTP/MCP/concurrency/exchange suite. It needs no Cloudflare credentials.
+`verify` runs strict checks, unit tests, production builds, and the isolated HTTP/MCP/concurrency/exchange/conformance suite. It needs no Cloudflare credentials.
 
 Include regression evidence when changing persistence, exchange, pagination, authentication, or concurrency. Test with the real local simulator and MCP clients rather than module mocks.
 

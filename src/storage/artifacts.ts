@@ -1,7 +1,7 @@
 import { clone, init, resolveRef, add, commit as gitCommit, push } from "isomorphic-git";
 import http from "isomorphic-git/http/web";
 import { createFsFromVolume, Volume } from "memfs";
-import { ApiError, stable, stateSchema, text, type State } from "../protocol/model.ts";
+import { ApiError, stable, decodeState, text, type State } from "../protocol/model.ts";
 import { withGitLockScope } from "./git-lock.ts";
 
 export const STORES = ["personal", "company"] as const;
@@ -50,7 +50,7 @@ export async function read(
 
   if (blob === null) throw new Error("Artifact state file missing");
 
-  return { state: stateSchema.parse(JSON.parse(await blob.text())), commit };
+  return { state: decodeState(JSON.parse(await blob.text())), commit };
 }
 
 /** Git's non-fast-forward rejection is the concurrency guard. Never force push. */
@@ -91,9 +91,7 @@ export async function mutate<T>(
 
         const state =
           history.length > 0
-            ? stateSchema.parse(
-                JSON.parse(String(await fs.promises.readFile(`${dir}/${FILE}`, "utf8"))),
-              )
+            ? decodeState(JSON.parse(String(await fs.promises.readFile(`${dir}/${FILE}`, "utf8"))))
             : empty(info.id);
 
         const before = stable(state);

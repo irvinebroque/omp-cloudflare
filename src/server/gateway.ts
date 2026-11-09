@@ -5,6 +5,7 @@ import type { gatewaySearchResponse } from "../protocol/contracts.ts";
 import { storeSchema } from "../protocol/contracts.ts";
 import { pageInput, paginate } from "../protocol/pagination.ts";
 import { applicable, validateContext } from "../protocol/runtime.ts";
+import { currentMemories, danglingReferences } from "../protocol/references.ts";
 
 export type GatewayHit = z.infer<typeof gatewaySearchResponse>["memories"][number];
 
@@ -19,14 +20,11 @@ export function targetStore(value?: JsonInput): Store {
 export function searchMemories(memories: Memory[], query: string, now = Date.now()): Memory[] {
   const q = query.toLowerCase();
 
-  return memories.filter(
-    (m) =>
-      (m.valid_from === undefined || Date.parse(m.valid_from) <= now) &&
-      (m.valid_until === undefined || Date.parse(m.valid_until) > now) &&
-      [m.identifier, m.title ?? "", m.body, m.tags?.join(" ") ?? ""]
-        .join("\n")
-        .toLowerCase()
-        .includes(q),
+  return currentMemories(memories, now).filter((m) =>
+    [m.identifier, m.title ?? "", m.body, m.tags?.join(" ") ?? ""]
+      .join("\n")
+      .toLowerCase()
+      .includes(q),
   );
 }
 
@@ -49,7 +47,7 @@ export function compareMemories(a: Memory, b: Memory) {
 export async function federatedSearch(artifacts: Artifacts, data: Record<string, JsonInput>) {
   const input = searchInput(data);
   const { query, as_of } = input;
-  const context = data.context === undefined ? undefined : validateContext(data.context);
+  const context = validateContext(data.context ?? {});
   const targets = data.store === undefined ? STORES : [targetStore(data.store)];
 
   const responses = await Promise.all(
@@ -57,9 +55,20 @@ export async function federatedSearch(artifacts: Artifacts, data: Record<string,
       try {
         const { state, commit } = await read(artifacts, store);
 
+        const diagnostics = danglingReferences(state.memories, state.origin);
         const hits: GatewayHit[] = searchMemories(state.memories, query, as_of).flatMap((memory) =>
-          context === undefined || applicable(memory, context, as_of)
-            ? [{ store, memory, commit }]
+          applicable(memory, context, as_of)
+            ? [
+                {
+                  store,
+                  memory,
+                  commit,
+                  dangling_references: diagnostics.filter(
+                    (item) =>
+                      item.identifier === memory.identifier && item.origin === memory.x_omp_origin,
+                  ),
+                },
+              ]
             : [],
         );
 

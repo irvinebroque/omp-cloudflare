@@ -24,6 +24,7 @@
     "test:e2e": "vpx scripts/test-e2e.ts",
     "verify": "npm run check && npm test && npm run build && npm run test:e2e",
     "concurrency:roundtrip": "vpx scripts/concurrency-roundtrip.ts",
+    "conformance:roundtrip": "vpx scripts/conformance-roundtrip.ts",
     "agent:roundtrip": "vpx scripts/agent-roundtrip.ts"
   },
   "dependencies": {

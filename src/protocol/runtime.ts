@@ -1,15 +1,7 @@
 import { createHash } from "node:crypto";
 import picomatch from "picomatch";
 import { z } from "zod";
-import {
-  ApiError,
-  jsonValue,
-  stable,
-  text,
-  type JsonInput,
-  type Memory,
-  type State,
-} from "./model.ts";
+import { ApiError, stable, text, type JsonInput, type Memory, type State } from "./model.ts";
 
 /** Local experimental conventions inspired by issue #22; not a settled OMP schema. */
 export const contextSchema = z.object({
@@ -107,10 +99,16 @@ export function validateContext(value: JsonInput): Context {
   return c;
 }
 
-export function applicable(memory: Memory, context: Context, now = Date.now()): boolean {
+export function applicable(
+  memory: Memory,
+  context: Context,
+  now = Date.now(),
+  includeInactive = false,
+): boolean {
   if (
-    (memory.valid_from !== undefined && Date.parse(memory.valid_from) > now) ||
-    (memory.valid_until !== undefined && Date.parse(memory.valid_until) <= now)
+    !includeInactive &&
+    ((memory.valid_from !== undefined && Date.parse(memory.valid_from) > now) ||
+      (memory.valid_until !== undefined && Date.parse(memory.valid_until) <= now))
   )
     return false;
   // Unknown imported applicability must not silently turn into a global instruction.
@@ -179,15 +177,13 @@ export function selectMemory(state: State, data: MemorySelection): Memory {
   return first;
 }
 
-export function addContribution(memory: Memory, contributor: string, contribution: string): Memory {
-  const parsed = z.array(jsonValue).safeParse(memory.provenance);
-
-  if (memory.provenance !== undefined && !parsed.success)
-    throw new ApiError(
-      409,
-      "Unsupported provenance shape; preserve the original evidence before updating",
-    );
-  const previous = parsed.success ? parsed.data : [];
+export function addContribution(
+  memory: Memory,
+  contributor: string,
+  contribution: string,
+  at = new Date().toISOString(),
+): Memory {
+  const previous = memory.provenance ?? [];
 
   if (previous.length >= 100) throw new ApiError(413, "Prototype limit: 100 provenance entries");
 
@@ -197,9 +193,13 @@ export function addContribution(memory: Memory, contributor: string, contributio
       ...previous,
       {
         id: text(contributor, "contributor"),
-        kind: contributor.startsWith("user:") ? "human" : "agent",
+        kind: contributor.startsWith("system:")
+          ? "system"
+          : contributor.startsWith("user:")
+            ? "human"
+            : "agent",
         contribution,
-        at: new Date().toISOString(),
+        at,
       },
     ],
   };

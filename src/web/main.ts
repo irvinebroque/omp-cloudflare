@@ -371,7 +371,9 @@ element("export", HTMLButtonElement).addEventListener(
 
     await appendPage(first.next_cursor);
 
-    const { next_cursor: _cursor, storage: _storage, ...snapshot } = first;
+    const { next_cursor: _cursor, storage: _storage, ...collected } = first;
+    const { x_omp_pagination: _pagination, ...manifest } = collected.manifest;
+    const snapshot = { ...collected, manifest: { ...manifest, selection: "snapshot" } };
 
     const url = URL.createObjectURL(
       new Blob([JSON.stringify(snapshot, null, 2) + "\n"], { type: "application/json" }),

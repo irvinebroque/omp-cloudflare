@@ -15,6 +15,7 @@ export const readResponse = z.object({
   memory: memorySchema,
   version: z.string(),
   commit: z.string(),
+  dangling_references: z.array(objectSchema).default([]),
 });
 
 export const savedResponse = readResponse.extend({ receipts: z.array(receiptSchema) });
@@ -35,7 +36,12 @@ export const searchResponse = z.object({
 
 export const gatewaySearchResponse = z.object({
   memories: z.array(
-    z.object({ store: storeSchema, memory: memorySchema, commit: z.string().nullable() }),
+    z.object({
+      store: storeSchema,
+      memory: memorySchema,
+      commit: z.string().nullable(),
+      dangling_references: z.array(objectSchema).default([]),
+    }),
   ),
   next_cursor: z.string().nullable(),
   total: z.number(),

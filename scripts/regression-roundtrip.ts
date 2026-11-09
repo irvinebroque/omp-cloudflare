@@ -46,8 +46,8 @@ try {
     identifier: id,
     body: "Pointer only",
     stub: true,
-    evidence: { uri: "https://example.invalid/evidence" },
-    provenance: { source: "legacy evidence" },
+    evidence: [{ uri: "https://example.invalid/evidence" }],
+    provenance: [{ id: "system:legacy", kind: "system", source: "legacy evidence" }],
     custom: { preserved: true },
   });
 
@@ -57,7 +57,7 @@ try {
   assert.deepEqual(fetched.memory, stored.memory);
   passed("MCP preserves opaque identifiers, stubs, evidence, and extension metadata");
 
-  const rejected = await mcp.callTool({
+  const updated = await mcp.callTool({
     name: "update_memory",
     arguments: {
       ...ref,
@@ -68,10 +68,12 @@ try {
     },
   });
 
-  assert.equal(rejected.isError, true);
-  assert.equal(z.object({ status: z.number() }).parse(rejected.structuredContent).status, 409);
-  assert.deepEqual((await personal.read(id)).memory, stored.memory);
-  passed("unsupported provenance update returns 409 without altering evidence");
+  assert.notEqual(updated.isError, true);
+  const revised = (await personal.read(id)).memory;
+  assert.deepEqual(revised.provenance?.slice(0, -1), stored.memory.provenance);
+  assert.equal(revised.provenance?.at(-1)?.id, "agent:regression");
+  assert.deepEqual(revised.evidence, stored.memory.evidence);
+  passed("updates preserve contributor extensions and evidence while recording the writer");
 
   const ordinary = await company.remember({ identifier: prefix + "-ordinary", body: prefix });
   created.push({ store: "company", identifier: ordinary.memory.identifier });
@@ -125,6 +127,15 @@ try {
     created_at: "2026-11-06T00:00:00Z",
     body: "Foreign copy " + origin,
   }));
+  copies.push({
+    identifier: prefix + "-root",
+    x_omp_origin: "first",
+    media_type: "text/markdown",
+    created_at: "2026-11-06T00:00:00Z",
+    body: `See [[${prefix}-shared]].`,
+    evidence: [{ target: prefix + "-shared", extension: { kept: true } }],
+    links: [{ target: prefix + "-shared", rel: "derived_from" }],
+  });
 
   const snapshot = archive({ origin: "source", memories: copies, tombstones: [] });
 
@@ -138,10 +149,20 @@ try {
   );
 
   const mapping = exported.manifest.x_omp_identity_map?.filter(
-    (item) => item.identifier === prefix + "-shared",
+    (item) => item.identifier === prefix + "-shared" || item.identifier === prefix + "-root",
   );
 
-  assert.equal(mapping?.length, 2);
+  assert.equal(mapping?.length, 3);
+  const exportedRoot = exported.memories.find((memory) => memory.identifier === prefix + "-root");
+  const exportedTarget = mapping?.find(
+    (item) => item.identifier === prefix + "-shared" && item.origin === "first",
+  );
+  assert.ok(exportedTarget !== undefined);
+  assert.equal(exportedRoot?.body, `See [[${exportedTarget.exported_identifier}]].`);
+  assert.deepEqual(exportedRoot?.evidence, [
+    { target: exportedTarget.exported_identifier, extension: { kept: true } },
+  ]);
+  assert.equal(exportedRoot?.links?.[0]?.target, exportedTarget.exported_identifier);
 
   const selected = {
     ...exported,
@@ -164,7 +185,9 @@ try {
     (await company.import(selected)).receipts.every((receipt) => receipt.status === "unchanged"),
     true,
   );
-  passed("mixed-origin export/import preserves both identities and repeated copies are idempotent");
+  passed(
+    "mixed-origin exchange rewrites links, evidence and inline references; imports restore original identities and content idempotently",
+  );
 
   // Content-free deletion markers intentionally remain: pruning them would permit resurrection.
   const ledgerOrigin = prefix + "-deleted";

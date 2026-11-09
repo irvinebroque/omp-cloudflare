@@ -31,6 +31,9 @@ import {
   validateContext,
   validateConventions,
 } from "../protocol/runtime.ts";
+import { z } from "zod";
+import { currentMemories, danglingReferences } from "../protocol/references.ts";
+import { assertNoCredentials } from "../protocol/credentials.ts";
 
 const json = (value: JsonInput, status = 200) =>
   Response.json(value, { status, headers: { "cache-control": "no-store" } });
@@ -84,6 +87,9 @@ export async function route(request: Request, env: Env): Promise<Response> {
       stores: STORES,
       gateway: "/gateway/info",
       namespace: "deployment-specific",
+      reference_convention: "omp-cloudflare-references/0.1",
+      credential_policy:
+        "Reject recognizable credential fields, assignments, key formats and the deployment access key. Arbitrary unlabelled secrets cannot be identified reliably.",
       storage: "Cloudflare Artifacts Git repositories",
       capabilities: [
         "remember",
@@ -179,20 +185,51 @@ export async function route(request: Request, env: Env): Promise<Response> {
 
   if (request.method === "GET" && path === "fmp/read_inferences") {
     const { state, commit } = await read(env.ARTIFACTS, store);
+    assertNoCredentials(
+      { memories: state.memories, tombstones: state.tombstones },
+      env.MEMORY_API_TOKEN,
+    );
+    const selectedOrigin = url.searchParams.get("origin");
+    if (selectedOrigin !== null) text(selectedOrigin, "origin");
+    const selected =
+      selectedOrigin === null
+        ? state
+        : {
+            ...state,
+            origin: selectedOrigin,
+            memories: state.memories.filter((memory) => memory.x_omp_origin === selectedOrigin),
+            tombstones: state.tombstones.filter((tombstone) => tombstone.origin === selectedOrigin),
+          };
 
     const input = pageInput({
       limit: EXPORT_TOMBSTONE_PAGE_SIZE,
       cursor: url.searchParams.get("cursor") ?? undefined,
     });
 
-    const chunk = paginate(state.tombstones, input, { commit, store, operation: "export" });
+    const chunk = paginate(selected.tombstones, input, {
+      commit,
+      store,
+      selectedOrigin,
+      operation: "export",
+    });
 
+    const snapshot = archive({
+      ...selected,
+      memories: input.position === undefined ? selected.memories : [],
+      tombstones: chunk.items,
+    });
     return json({
-      ...archive({
-        ...state,
-        memories: input.position === undefined ? state.memories : [],
-        tombstones: chunk.items,
-      }),
+      ...snapshot,
+      manifest: {
+        ...snapshot.manifest,
+        selection: "selection",
+        x_omp_pagination: {
+          complete: false,
+          commit,
+          offset: input.position?.offset ?? 0,
+          total_tombstones: selected.tombstones.length,
+        },
+      },
       next_cursor: chunk.next_cursor,
       storage: { provider: "cloudflare-artifacts", repo: store, commit },
     });
@@ -209,20 +246,32 @@ export async function route(request: Request, env: Env): Promise<Response> {
       origin: data.origin === undefined ? undefined : text(data.origin, "origin"),
     });
 
-    if (data.context !== undefined && !applicable(memory, validateContext(data.context)))
+    const historical = z.boolean().default(false).safeParse(data.include_inactive);
+    if (!historical.success) throw new ApiError(400, "include_inactive must be a boolean");
+    if (
+      (!historical.data && !currentMemories(state.memories).includes(memory)) ||
+      !applicable(memory, validateContext(data.context ?? {}), Date.now(), historical.data)
+    )
       throw new ApiError(404, "Memory is not applicable in this context");
 
-    return json({ memory, version: memoryVersion(memory), commit });
+    return json({
+      memory,
+      version: memoryVersion(memory),
+      commit,
+      dangling_references: danglingReferences(state.memories, state.origin).filter(
+        (item) => item.identifier === memory.identifier && item.origin === memory.x_omp_origin,
+      ),
+    });
   }
 
   if (path === "fmp/search") {
     const input = searchInput(data);
     const { query, as_of } = input;
     const { state, commit } = await read(env.ARTIFACTS, store);
-    const context = data.context === undefined ? undefined : validateContext(data.context);
+    const context = validateContext(data.context ?? {});
 
     const memories = searchMemories(state.memories, query, as_of)
-      .filter((m) => context === undefined || applicable(m, context, as_of))
+      .filter((m) => applicable(m, context, as_of))
       .toSorted(compareMemories);
 
     const chunk = paginate(memories, input, { commit, store, context });
@@ -231,6 +280,12 @@ export async function route(request: Request, env: Env): Promise<Response> {
       memories: chunk.items,
       total: chunk.total,
       next_cursor: chunk.next_cursor,
+      dangling_references: danglingReferences(state.memories, state.origin).filter((item) =>
+        chunk.items.some(
+          (memory) => memory.identifier === item.identifier && memory.x_omp_origin === item.origin,
+        ),
+      ),
+      quarantined_records: state.quarantined?.length ?? 0,
       commit,
     });
   }
@@ -244,9 +299,21 @@ export async function route(request: Request, env: Env): Promise<Response> {
     });
 
     validateConventions(memory);
+    if (memory.checksum !== undefined || memory.version !== undefined)
+      throw new ApiError(
+        400,
+        "Use import to preserve externally checksummed or versioned memories",
+      );
 
-    if (data.contributor !== undefined)
-      memory = addContribution(memory, text(data.contributor, "contributor"), "authored");
+    memory = addContribution(
+      memory,
+      data.contributor === undefined
+        ? "system:omp-cloudflare"
+        : text(data.contributor, "contributor"),
+      data.contributor === undefined ? "recorded" : "authored",
+      memory.created_at,
+    );
+    assertNoCredentials(memory, env.MEMORY_API_TOKEN);
 
     if (memory.x_omp_origin !== undefined)
       throw new ApiError(400, "Use import to ingest memories from another origin");
@@ -280,15 +347,33 @@ export async function route(request: Request, env: Env): Promise<Response> {
 
       if (old.x_omp_origin !== state.origin)
         throw new ApiError(409, "Imported memories are immutable here; create a new local memory");
+      if (old.checksum !== undefined || old.version !== undefined)
+        throw new ApiError(
+          409,
+          "Cannot revise a portable checksummed or versioned memory; create a new local memory",
+        );
       const patch = object(data.patch);
 
-      for (const field of ["identifier", "created_at", "x_omp_origin"])
+      for (const field of [
+        "identifier",
+        "created_at",
+        "x_omp_origin",
+        "provenance",
+        "checksum",
+        "version",
+      ])
         if (field in patch) throw new ApiError(400, `Cannot patch ${field}`);
       let memory = validateMemory({ ...old, ...patch, updated_at: new Date().toISOString() });
       validateConventions(memory);
 
-      if (data.contributor !== undefined)
-        memory = addContribution(memory, text(data.contributor, "contributor"), "corrected");
+      memory = addContribution(
+        memory,
+        data.contributor === undefined
+          ? "system:omp-cloudflare"
+          : text(data.contributor, "contributor"),
+        "corrected",
+      );
+      assertNoCredentials(memory, env.MEMORY_API_TOKEN);
       state.memories = state.memories.map((m) =>
         key(m, state.origin) === key(old, state.origin) ? memory : m,
       );
@@ -334,7 +419,19 @@ export async function route(request: Request, env: Env): Promise<Response> {
         origin: m.x_omp_origin ?? state.origin,
         identifier: m.identifier,
         deleted_at: new Date().toISOString(),
+        provenance: addContribution(
+          { ...m, provenance: [] },
+          data.contributor === undefined
+            ? "system:omp-cloudflare"
+            : text(data.contributor, "contributor"),
+          "deleted",
+        ).provenance,
+        reason:
+          data.reason === undefined
+            ? "Deletion requested through memory API"
+            : text(data.reason, "reason", 1024),
       };
+      assertNoCredentials(tombstone, env.MEMORY_API_TOKEN);
 
       merge(state, [], [tombstone]);
 
@@ -347,10 +444,11 @@ export async function route(request: Request, env: Env): Promise<Response> {
   if (path === "fmp/import") {
     const parsed = archiveSchema.safeParse(data);
 
-    if (!parsed.success)
-      throw new ApiError(400, "Invalid supported OMP minimal snapshot/copy archive");
+    if (!parsed.success) throw new ApiError(400, "Invalid supported OMP minimal copy archive");
     const { tombstones } = parsed.data;
+    assertNoCredentials(tombstones, env.MEMORY_API_TOKEN);
     const memories = importedMemories(parsed.data);
+    memories.forEach((memory) => assertNoCredentials(memory, env.MEMORY_API_TOKEN));
 
     const result = await mutate(env.ARTIFACTS, store, "Import OMP snapshot", (state) => ({
       receipts: merge(state, memories, tombstones),
