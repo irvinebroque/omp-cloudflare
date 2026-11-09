@@ -4,6 +4,8 @@
 
 This example runs both an **OMP gateway** and the **memory stores** on Cloudflare Workers, with a [Pi chat agent](https://developers.cloudflare.com/agents/harnesses/pi/) to try them. It targets the v0.5 draft's minimal profile. See [protocol coverage and conventions](CONFORMANCE.md) for supported behavior, exchange requirements and limitations.
 
+**Clone your memory, inspect its history, and use it across agents.** Memories live in Git repositories in your Cloudflare account, with MCP access and OMP export/import.
+
 [![Verify](https://github.com/irvinebroque/omp-cloudflare/actions/workflows/ci.yml/badge.svg)](https://github.com/irvinebroque/omp-cloudflare/actions/workflows/ci.yml)
 
 ```mermaid
@@ -27,15 +29,6 @@ flowchart TD
 - **Chat demo:** saves and recalls memories through the selected store. A new chat starts a new transcript while keeping saved memories.
 
 [Cloudflare Artifacts](https://developers.cloudflare.com/artifacts/) is managed, versioned storage with a Git-compatible interface. This example creates one Git repository per store in your Cloudflare account. Each holds an `omp-state.json` file containing memories and deletion markers; every mutation creates a Git commit. Deleting a memory removes it from current results but retains its Git history.
-
-## Workspace
-
-This pnpm monorepo contains two packages:
-
-- [`packages/omp-sdk`](packages/omp-sdk): `@omp-cloudflare/sdk`, with portable types and validation, experimental exchange/reference helpers, the example's HTTP binding, and shared test fixtures. It builds ESM JavaScript and TypeScript declarations.
-- [`apps/cloudflare`](apps/cloudflare): the Worker, Artifacts storage, MCP server and Pi chat demo. It consumes the SDK through `workspace:*`.
-
-Use the pinned pnpm version in `package.json` (install it with `corepack enable` if needed). Root commands build the SDK before starting or building the app. The SDK is built locally; this does not publish it to a registry.
 
 ## Deploy
 
@@ -85,7 +78,57 @@ Open **http://localhost:5173** and select **Connect**. The development access ke
 2. Select **New chat**.
 3. Ask: **“What response style do I prefer?”**
 
-To transfer memories, **Export** under **Memories**, connect to the other store, then **Import** the file.
+### Clone your memory
+
+After saving a memory in your deployed demo, clone its Artifacts repository with a short-lived read token. From this checkout, with Git, [jq](https://jqlang.org/) and `cf` signed in to your Cloudflare account:
+
+```sh
+# Use your deployed namespace, normally the project name. Use company for the other store.
+OMP_NAMESPACE=omp-cloudflare
+OMP_STORE=personal
+
+ARTIFACTS_REMOTE=$(
+  pnpm --filter omp-cloudflare exec cf artifacts namespaces repos get "$OMP_STORE" \
+    --namespace "$OMP_NAMESPACE" | jq -er '(.result // .).remote'
+)
+ARTIFACTS_TOKEN=$(
+  pnpm --filter omp-cloudflare exec cf artifacts namespaces tokens create "$OMP_NAMESPACE" \
+    --repo "$OMP_STORE" --scope read --ttl 3600 | jq -er '(.result // .).plaintext'
+)
+
+git -c http.extraHeader="Authorization: Bearer $ARTIFACTS_TOKEN" \
+  clone "$ARTIFACTS_REMOTE" my-memory
+git -C my-memory log --oneline
+git -C my-memory show HEAD -- omp-state.json
+```
+
+Open `my-memory/omp-state.json` for full records and provenance, or `my-memory/MEMORY.md` for an index. Save another memory through the agent, then inspect the change:
+
+```sh
+git -C my-memory -c http.extraHeader="Authorization: Bearer $ARTIFACTS_TOKEN" fetch origin
+git -C my-memory diff HEAD..origin/main -- omp-state.json
+```
+
+The repo token expires after one hour and is separate from the demo's access key. This follows [Artifacts' Git authentication flow](https://developers.cloudflare.com/artifacts/examples/git-client/), keeping the token out of the saved remote URL. The checkout contains this app's storage format and Git history, including deleted memories; use OMP export for interchange.
+
+### Use the same memory from another agent
+
+Connect an MCP-capable agent to `https://<your-worker>/mcp` using `Authorization: Bearer <your-access-key>`. Ask it to recall the preference you saved in chat: `search_memories` finds matching records, and `get_memory` retrieves their full content and provenance. The gateway searches Personal and Company together and lets the agent choose a store for writes. Memory use depends on the agent calling the tools.
+
+### Move memories or build your own client
+
+Select **Export** under **Memories**, connect to another store or deployment, then **Import** the file. The copy preserves original identity, provenance and custom metadata; repeated imports are idempotent. Export includes deletion markers to prevent stale copies from resurrecting deleted records.
+
+The [TypeScript SDK](packages/omp-sdk) provides portable validation, experimental exchange helpers and this server's HTTP client. Use it independently of the chat UI to build another client or memory integration.
+
+## Workspace
+
+This pnpm monorepo contains two packages:
+
+- [`packages/omp-sdk`](packages/omp-sdk): `@omp-cloudflare/sdk`, with portable types and validation, experimental exchange/reference helpers, the example's HTTP binding, and shared test fixtures. It builds ESM JavaScript and TypeScript declarations.
+- [`apps/cloudflare`](apps/cloudflare): the Worker, Artifacts storage, MCP server and Pi chat demo. It consumes the SDK through `workspace:*`.
+
+Use the pinned pnpm version in `package.json` (install it with `corepack enable` if needed). Root commands build the SDK before starting or building the app. The SDK is built locally; this does not publish it to a registry.
 
 ## More
 
