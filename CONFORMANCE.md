@@ -30,4 +30,6 @@ Audit, secure forgetting, ACL enforcement, Markdown directory loading, moves, au
 
 ## Verification
 
-`npm run verify` includes strict checks, unit tests, builds and isolated HTTP/MCP/concurrency/exchange tests. The `conformance:roundtrip` script adds regression checks for malformed metadata, provenance, lifecycle, dangling references, credential rejection and export completeness. These checks verify this implementation's supported contract; they are not an official OMP certification suite.
+`pnpm verify` includes strict checks, unit tests, builds and isolated HTTP/MCP/concurrency/exchange tests. The `conformance:roundtrip` script adds regression checks for malformed metadata, provenance, lifecycle, dangling references, credential rejection and export completeness. These checks verify this implementation's supported contract; they are not an official OMP certification suite.
+
+The reusable implementation lives in [`packages/omp-sdk`](packages/omp-sdk). Core validation is independent of this deployment’s quotas and credential policy. Exchange/reference/runtime conventions and the Cloudflare HTTP binding have separate package entry points, so consumers can distinguish them from the draft memory schema.

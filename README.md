@@ -28,6 +28,15 @@ flowchart TD
 
 [Cloudflare Artifacts](https://developers.cloudflare.com/artifacts/) is managed, versioned storage with a Git-compatible interface. This example creates one Git repository per store in your Cloudflare account. Each holds an `omp-state.json` file containing memories and deletion markers; every mutation creates a Git commit. Deleting a memory removes it from current results but retains its Git history.
 
+## Workspace
+
+This pnpm monorepo contains two packages:
+
+- [`packages/omp-sdk`](packages/omp-sdk): `@omp-cloudflare/sdk`, with portable types and validation, experimental exchange/reference helpers, the example's HTTP binding, and shared test fixtures. It builds ESM JavaScript and TypeScript declarations.
+- [`apps/cloudflare`](apps/cloudflare): the Worker, Artifacts storage, MCP server and Pi chat demo. It consumes the SDK through `workspace:*`.
+
+Use the pinned pnpm version in `package.json` (install it with `corepack enable` if needed). Root commands build the SDK before starting or building the app. The SDK is built locally; this does not publish it to a registry.
+
 ## Deploy
 
 Requires [Workers Paid and Artifacts access](https://developers.cloudflare.com/artifacts/get-started/). AI usage is billed to your account.
@@ -42,14 +51,14 @@ Requires [Workers Paid and Artifacts access](https://developers.cloudflare.com/a
 
    [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/irvinebroque/omp-cloudflare)
 
-3. Use Node **24.22+** (24.x), keep `npm run build` and `npm run deploy`, and disable **Preview builds**. The build token needs Workers Scripts and Artifacts write access.
+3. Use Node **24.22+** (24.x), use `pnpm build` and `pnpm run deploy` from the repository root, and disable **Preview builds**. Set the install command to `pnpm install --frozen-lockfile`. The build token needs Workers Scripts and Artifacts write access.
 4. Open your Worker URL. Select **Connect**, paste your access key, and connect.
 
-To deploy from your checkout after `npm ci` and `npx cf auth login`:
+To deploy from your checkout after `pnpm install --frozen-lockfile` and `pnpm --filter omp-cloudflare exec cf auth login`:
 
 ```sh
 export MEMORY_API_TOKEN=your-saved-key
-npm run deploy
+pnpm run deploy
 ```
 
 ### Access key
@@ -63,9 +72,9 @@ Use Node **24.22+** (24.x) and a Cloudflare account.
 ```sh
 git clone https://github.com/irvinebroque/omp-cloudflare.git
 cd omp-cloudflare
-npm ci
-npx cf auth login
-OMP_REMOTE_AI=true npm run dev
+pnpm install --frozen-lockfile
+pnpm --filter omp-cloudflare exec cf auth login
+OMP_REMOTE_AI=true pnpm dev
 ```
 
 Open **http://localhost:5173** and select **Connect**. The development access key is filled in for you. Local chat uses your account’s Workers AI. Set `CLOUDFLARE_ACCOUNT_ID` to choose an account explicitly.

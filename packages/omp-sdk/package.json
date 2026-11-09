@@ -1,0 +1,54 @@
+{
+  "name": "@omp-cloudflare/sdk",
+  "version": "0.1.0",
+  "description": "Experimental TypeScript utilities for the OMP v0.5 editors draft",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/irvinebroque/omp-cloudflare.git",
+    "directory": "packages/omp-sdk"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./experimental": {
+      "types": "./dist/experimental.d.ts",
+      "import": "./dist/experimental.js"
+    },
+    "./bindings/omp-cloudflare": {
+      "types": "./dist/bindings/omp-cloudflare.d.ts",
+      "import": "./dist/bindings/omp-cloudflare.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --noEmit && vp pack && tsc -p tests/types",
+    "check": "tsc --noEmit && tsc -p tests/types",
+    "test": "pnpm build && pnpm --dir ../.. exec vp test run packages/omp-sdk/tests"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.4.0",
+    "picomatch": "^4.0.7",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/picomatch": "^4.0.3",
+    "typescript": "^7.0.2",
+    "vite-plus": "1.5.0"
+  },
+  "engines": {
+    "node": "^24.22.0 || ^26.12.0"
+  }
+}

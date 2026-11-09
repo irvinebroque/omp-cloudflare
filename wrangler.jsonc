@@ -1,8 +1,8 @@
 {
   // Deploy-button metadata. cf reads name and compatibility_date from this file.
-  // Worker behavior and bindings are configured in cloudflare.config.ts.
+  // Worker behavior and bindings are configured in apps/cloudflare/cloudflare.config.ts.
   "name": "omp-cloudflare",
-  "main": "src/index.ts",
+  "main": "apps/cloudflare/src/index.ts",
   "compatibility_date": "2026-11-08",
   "compatibility_flags": ["nodejs_compat"],
   "artifacts": [{ "binding": "ARTIFACTS", "namespace": "omp-cloudflare" }],

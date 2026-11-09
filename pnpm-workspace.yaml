@@ -1,0 +1,18 @@
+packages:
+  - apps/*
+  - packages/*
+
+overrides:
+  vite: npm:@voidzero-dev/vite-plus-core@1.5.0
+
+allowBuilds:
+  esbuild: true
+  workerd: true
+  "@google/genai": false
+  core-js-pure: false
+  protobufjs: false
+
+# Vite+ 1.5.0 supplies the Vite 8 API under the vite alias.
+peerDependencyRules:
+  allowedVersions:
+    vite: "1.5.0"

@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "vite-plus/client"]
+  },
+  "include": ["src", "scripts", "tests", "*.ts", ".cloudflare/types"],
+  "exclude": ["src/web"]
+}

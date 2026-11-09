@@ -1,5 +1,5 @@
 {
-  "name": "omp-cloudflare",
+  "name": "omp-cloudflare-workspace",
   "version": "0.1.0",
   "private": true,
   "description": "An Open Memory Protocol v0.5 example on Cloudflare Workers and Artifacts",
@@ -10,53 +10,34 @@
   },
   "type": "module",
   "scripts": {
-    "dev": "cf dev",
-    "build": "cf build",
-    "deploy": "vpx scripts/deploy.ts",
-    "roundtrip": "vpx scripts/roundtrip.ts",
-    "mcp:roundtrip": "vpx scripts/mcp-roundtrip.ts",
-    "check": "cf workers types && vp check --deny-warnings && tsc -p src/web",
-    "lint": "cf workers types && vp lint --deny-warnings",
+    "dev": "pnpm sdk:build && pnpm --filter omp-cloudflare dev",
+    "sdk:build": "pnpm --filter @omp-cloudflare/sdk build",
+    "build": "pnpm sdk:build && pnpm --filter omp-cloudflare build",
+    "deploy": "pnpm sdk:build && pnpm --filter omp-cloudflare run deploy",
+    "check": "pnpm sdk:build && pnpm --filter omp-cloudflare check && vp check --deny-warnings && pnpm --filter @omp-cloudflare/sdk check",
+    "lint": "vp lint --deny-warnings",
     "lint:fix": "vp lint --fix",
     "format": "vp fmt",
-    "regression:roundtrip": "vpx scripts/regression-roundtrip.ts",
-    "test": "vp test run",
-    "test:e2e": "vpx scripts/test-e2e.ts",
-    "verify": "npm run check && npm test && npm run build && npm run test:e2e",
-    "concurrency:roundtrip": "vpx scripts/concurrency-roundtrip.ts",
-    "conformance:roundtrip": "vpx scripts/conformance-roundtrip.ts",
-    "agent:roundtrip": "vpx scripts/agent-roundtrip.ts"
-  },
-  "dependencies": {
-    "@earendil-works/chord": "~1.5.0",
-    "@earendil-works/pi-ai": "~1.5.0",
-    "@earendil-works/pi-durable": "~1.5.0",
-    "@earendil-works/pi-schema": "~1.5.0",
-    "@modelcontextprotocol/server": "2.4.0",
-    "agents": "0.33.0",
-    "isomorphic-git": "1.44.11",
-    "memfs": "^4.80.0",
-    "picomatch": "^4.0.7",
-    "zod": "^4.6.7"
+    "test": "pnpm sdk:build && vp test run",
+    "test:e2e": "pnpm sdk:build && pnpm --filter omp-cloudflare test:e2e",
+    "verify": "pnpm check && pnpm test && pnpm build && pnpm test:e2e",
+    "roundtrip": "pnpm --filter omp-cloudflare roundtrip",
+    "mcp:roundtrip": "pnpm --filter omp-cloudflare mcp:roundtrip",
+    "regression:roundtrip": "pnpm --filter omp-cloudflare regression:roundtrip",
+    "concurrency:roundtrip": "pnpm --filter omp-cloudflare concurrency:roundtrip",
+    "conformance:roundtrip": "pnpm --filter omp-cloudflare conformance:roundtrip",
+    "agent:roundtrip": "pnpm --filter omp-cloudflare agent:roundtrip"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "beta",
-    "@modelcontextprotocol/client": "2.4.0",
     "@types/node": "^26.6.6",
-    "@types/picomatch": "^4.0.3",
-    "cf": "^1.0.0-beta.17",
-    "json5": "2.2.3",
     "typescript": "^7.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.5.0",
     "vite-plus": "1.5.0"
   },
-  "overrides": {
-    "vite": "npm:@voidzero-dev/vite-plus-core@1.5.0"
-  },
   "engines": {
     "node": "^24.22.0 || ^26.12.0"
   },
-  "packageManager": "npm@11.19.1",
+  "packageManager": "pnpm@12.18.0",
   "cloudflare": {
     "bindings": {
       "MEMORY_API_TOKEN": {

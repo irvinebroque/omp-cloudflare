@@ -1,0 +1,50 @@
+{
+  "name": "omp-cloudflare",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An Open Memory Protocol v0.5 example on Cloudflare Workers and Artifacts",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/irvinebroque/omp-cloudflare.git"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "cf dev",
+    "build": "cf build",
+    "deploy": "vpx scripts/deploy.ts",
+    "roundtrip": "vpx scripts/roundtrip.ts",
+    "mcp:roundtrip": "vpx scripts/mcp-roundtrip.ts",
+    "regression:roundtrip": "vpx scripts/regression-roundtrip.ts",
+    "test:e2e": "vpx scripts/test-e2e.ts",
+    "concurrency:roundtrip": "vpx scripts/concurrency-roundtrip.ts",
+    "conformance:roundtrip": "vpx scripts/conformance-roundtrip.ts",
+    "agent:roundtrip": "vpx scripts/agent-roundtrip.ts",
+    "check": "cf workers types && tsc --noEmit && tsc -p src/web"
+  },
+  "dependencies": {
+    "@earendil-works/chord": "~1.5.0",
+    "@earendil-works/pi-ai": "~1.5.0",
+    "@earendil-works/pi-durable": "~1.5.0",
+    "@earendil-works/pi-schema": "~1.5.0",
+    "@modelcontextprotocol/server": "2.4.0",
+    "@omp-cloudflare/sdk": "workspace:*",
+    "agents": "0.33.0",
+    "isomorphic-git": "1.44.11",
+    "memfs": "^4.80.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "beta",
+    "@modelcontextprotocol/client": "2.4.0",
+    "@types/node": "^26.6.6",
+    "cf": "^1.0.0-beta.17",
+    "json5": "2.2.3",
+    "typescript": "^7.0.2",
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.5.0",
+    "vite-plus": "1.5.0"
+  },
+  "engines": {
+    "node": "^24.22.0 || ^26.12.0"
+  }
+}
