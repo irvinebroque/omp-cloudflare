@@ -22,6 +22,21 @@ describe("public portable memory contract", () => {
     };
     expect(memorySchema.parse(large)).toEqual(large);
   });
+  it("§§2.2/3.2 preserve valid MIME parameters and reject line breaks and malformed quoting", () => {
+    for (const media_type of [
+      "text/markdown; charset=utf-8",
+      'text/plain; note="quoted\\\"value"',
+      "application/json; ext*=utf-8''hello%20world",
+    ])
+      expect(memorySchema.parse({ ...referenceMemory, media_type }).media_type).toBe(media_type);
+    for (const media_type of [
+      "text/plain\n; charset=utf-8",
+      'text/plain; note="unclosed',
+      'text/plain; note="bad\u0000control"',
+      "text/plain; charset=with spaces",
+    ])
+      expect(memorySchema.safeParse({ ...referenceMemory, media_type }).success).toBe(false);
+  });
   it("appends explicit contributors without changing existing attribution or input", () => {
     const original = structuredClone(referenceMemory);
     const first = { id: "opaque-author", kind: "human" as const, extension: { nested: [true] } };

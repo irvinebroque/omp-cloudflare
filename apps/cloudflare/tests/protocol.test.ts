@@ -11,6 +11,32 @@ import {
 import { memoryVersion } from "../src/protocol/runtime.ts";
 import { applicable, repositoryKey, relativePath } from "../src/protocol/context.ts";
 import { authorize } from "../src/server/auth.ts";
+import { compareMemoryVersions } from "../src/protocol/versions.ts";
+
+it("§6.1 compares opaque revisions only within their origin and identity, without ordering by time", () => {
+  const left = {
+    identifier: "revision",
+    media_type: "text/plain",
+    body: "Revision",
+    created_at: "2026-11-09T00:00:00Z",
+    x_omp_origin: "source:a",
+    version: { sequence: 1, branch: "main" },
+  };
+  expect(compareMemoryVersions(left, { ...left, version: { branch: "main", sequence: 1 } })).toBe(
+    "equal",
+  );
+  expect(compareMemoryVersions(left, { ...left, version: { sequence: 2, branch: "main" } })).toBe(
+    "incomparable",
+  );
+  expect(compareMemoryVersions(left, { ...left, x_omp_origin: "source:b" })).toBe("incomparable");
+  expect(compareMemoryVersions(left, { ...left, identifier: "another" })).toBe("incomparable");
+  expect(
+    compareMemoryVersions(
+      { ...left, version: "2026-11-09T00:00:00Z" },
+      { ...left, version: "2026-11-10T00:00:00Z" },
+    ),
+  ).toBe("incomparable");
+});
 
 it("fails closed for an absent secret or the former example placeholder", () => {
   const request = new Request("https://example.invalid");

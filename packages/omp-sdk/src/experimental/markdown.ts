@@ -1,7 +1,14 @@
 import { z } from "zod";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { OmpError, label, objectSchema, validateMemory, type Memory } from "../core/index.ts";
+import {
+  OmpError,
+  assertNoCredentials,
+  label,
+  objectSchema,
+  validateMemory,
+  type Memory,
+} from "../core/index.ts";
 import { archiveSchema, importedMemories, type Archive } from "./exchange.ts";
 
 /** Repository-local experimental encoding; the draft does not prescribe a file syntax. */
@@ -90,6 +97,7 @@ function plain(value: string): string {
 
 /** Pure projection: callers decide how and where to persist the returned files. */
 export function exportMarkdown(input: Archive): { files: Map<string, string> } {
+  assertNoCredentials(input);
   const snapshot = archiveSchema.parse(input);
   const originals = importedMemories(snapshot);
   const files = new Map<string, string>();

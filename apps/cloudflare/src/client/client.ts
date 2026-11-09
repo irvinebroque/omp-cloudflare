@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { JsonInput, Memory } from "omp-sdk/core";
+import type { Contributor, JsonInput, Memory } from "omp-sdk/core";
 import type { Archive } from "omp-sdk/experimental";
 import type { Context } from "../protocol/context.ts";
 import {
@@ -49,7 +49,10 @@ export class OmpClient {
   info(): Promise<z.output<typeof storeInfoResponse>> {
     return this.request("fmp/info", storeInfoResponse);
   }
-  remember(memory: MemoryInput, contributor?: string): Promise<z.output<typeof savedResponse>> {
+  remember(
+    memory: MemoryInput,
+    contributor?: Contributor,
+  ): Promise<z.output<typeof savedResponse>> {
     return this.request("fmp/upload/inferences", savedResponse, { memory, contributor });
   }
   read(
@@ -78,7 +81,7 @@ export class OmpClient {
     patch: Partial<Memory>,
     origin?: string,
     if_version?: string,
-    contributor?: string,
+    contributor?: Contributor,
   ): Promise<z.output<typeof readResponse>> {
     return this.request("fmp/update", readResponse, {
       identifier,
@@ -92,7 +95,7 @@ export class OmpClient {
     identifier: string,
     origin?: string,
     if_version?: string,
-    contributor?: string,
+    contributor?: Contributor,
     reason?: string,
   ): Promise<z.output<typeof deletedResponse>> {
     return this.request("fmp/delete", deletedResponse, {
@@ -180,7 +183,7 @@ export class OmpGateway {
   remember(
     memory: MemoryInput,
     store: Store = "personal",
-    contributor?: string,
+    contributor?: Contributor,
   ): Promise<z.output<typeof routedSavedResponse>> {
     return this.request("fmp/upload/inferences", routedSavedResponse, {
       memory,

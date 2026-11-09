@@ -34,3 +34,9 @@ const { files } = exportMarkdown(await client.snapshot());
 ```
 
 `OmpClient` supports discovery, remember, read, search, update, delete, export, import and history. `snapshot(origin?)` collects all pages before marking the envelope complete. `importSnapshot` batches tombstones and is not atomic. `OmpGateway` searches both stores and routes writes explicitly. These contracts and their authentication/concurrency behavior belong to this implementation.
+
+## Contributor and scope requirements
+
+Authoring APIs take an explicit contributor object, for example `{ id: "agent:example", kind: "agent" }`, using the draft’s contributor fields. ID prefixes do not determine kind. Contributor strings are rejected; callers migrating from the former string argument must supply `id` and `kind`. Omission records the known storage process as a system contributor, without inventing an original author. The app records its actual write time, independently of a supplied historical `created_at`.
+
+`scope` belongs to the serving system. Authoring and update requests cannot assign it. Imports retain external scope metadata as claims; those tags never grant access. This single-operator app does not implement scope-based ACLs. Its `/fmp/info` response declares the comparison of imported opaque `memory.version` values; response `version` tokens separately guard conditional writes.

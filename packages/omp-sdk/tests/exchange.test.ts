@@ -8,6 +8,36 @@ import {
 } from "omp-sdk/experimental";
 import { collisionMemories, referenceMemory } from "omp-sdk/testing";
 
+it("§8.6 rejects recognizable credential data at the portable export boundary", () => {
+  const secret = "synthetic-secret-for-regression";
+  for (const memory of [
+    { ...referenceMemory, api_key: secret },
+    { ...referenceMemory, body: "password: " + secret },
+  ]) {
+    try {
+      archive({ origin: "source", memories: [memory], tombstones: [] });
+      throw new Error("Expected credential rejection");
+    } catch (error) {
+      expect(error).toMatchObject({ code: "invalid_input" });
+      expect(error instanceof Error && error.message.includes(secret)).toBe(false);
+    }
+  }
+  expect(() =>
+    archive({
+      origin: "source",
+      memories: [referenceMemory],
+      tombstones: [
+        {
+          origin: "source",
+          identifier: "deleted",
+          deleted_at: "2026-11-09T00:00:00Z",
+          password: secret,
+        },
+      ],
+    }),
+  ).toThrow("recognizable credentials");
+});
+
 it("round trips mixed origins through the public experimental envelope without losing references", () => {
   const memories = collisionMemories();
   const snapshot = archive(

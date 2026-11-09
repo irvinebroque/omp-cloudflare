@@ -10,6 +10,7 @@ import {
   archiveSchema,
   objectSchema,
   jsonValue,
+  stable,
   type JsonInput,
   type Json,
   validateMemory,
@@ -34,6 +35,7 @@ import {
 import { z } from "zod";
 import { currentMemories, danglingReferences } from "omp-sdk/experimental";
 import { assertNoCredentials } from "../protocol/credentials.ts";
+import { versionComparison } from "../protocol/versions.ts";
 
 const json = (value: JsonInput, status = 200) =>
   Response.json(value, { status, headers: { "cache-control": "no-store" } });
@@ -88,6 +90,7 @@ export async function route(request: Request, env: Env): Promise<Response> {
       gateway: "/gateway/info",
       namespace: "deployment-specific",
       reference_convention: "omp-references/0.1",
+      version_comparison: versionComparison,
       credential_policy:
         "Reject recognizable credential fields, assignments, key formats and the deployment access key. Arbitrary unlabelled secrets cannot be identified reliably.",
       storage: "Cloudflare Artifacts Git repositories",
@@ -299,29 +302,48 @@ export async function route(request: Request, env: Env): Promise<Response> {
     });
 
     validateConventions(memory);
+    if (memory.scope !== undefined)
+      throw new ApiError(400, "scope is assigned by the serving system, not memory authors");
     if (memory.checksum !== undefined || memory.version !== undefined)
       throw new ApiError(
         400,
         "Use import to preserve externally checksummed or versioned memories",
       );
 
+    const inputMemory = memory;
     memory = addContribution(
       memory,
-      data.contributor === undefined
-        ? "system:omp-cloudflare"
-        : text(data.contributor, "contributor"),
+      data.contributor,
       data.contributor === undefined ? "recorded" : "authored",
-      memory.created_at,
     );
     assertNoCredentials(memory, env.MEMORY_API_TOKEN);
 
     if (memory.x_omp_origin !== undefined)
       throw new ApiError(400, "Use import to ingest memories from another origin");
 
-    const saved = await mutate(env.ARTIFACTS, store, `Remember ${memory.identifier}`, (state) => ({
-      receipts: merge(state, [memory]),
-      memory: { ...memory, x_omp_origin: state.origin },
-    }));
+    const saved = await mutate(env.ARTIFACTS, store, `Remember ${memory.identifier}`, (state) => {
+      let candidate = memory;
+      const previous = state.memories.find(
+        (item) => item.identifier === memory.identifier && item.x_omp_origin === state.origin,
+      );
+      const recordedAt = previous?.provenance?.at(-1)?.at;
+      if (previous !== undefined && recordedAt !== undefined) {
+        const replay = addContribution(
+          inputMemory,
+          data.contributor,
+          data.contributor === undefined ? "recorded" : "authored",
+          recordedAt,
+        );
+        // A retry did not perform another write: retain the original writer time only
+        // when the complete memory and explicit contributor match that prior write.
+        if (stable({ ...replay, x_omp_origin: state.origin }) === stable(previous))
+          candidate = previous;
+      }
+      return {
+        receipts: merge(state, [candidate]),
+        memory: { ...candidate, x_omp_origin: state.origin },
+      };
+    });
 
     return json(
       { ...saved.result, version: memoryVersion(saved.result.memory), commit: saved.commit },
@@ -361,18 +383,13 @@ export async function route(request: Request, env: Env): Promise<Response> {
         "provenance",
         "checksum",
         "version",
+        "scope",
       ])
         if (field in patch) throw new ApiError(400, `Cannot patch ${field}`);
       let memory = validateMemory({ ...old, ...patch, updated_at: new Date().toISOString() });
       validateConventions(memory);
 
-      memory = addContribution(
-        memory,
-        data.contributor === undefined
-          ? "system:omp-cloudflare"
-          : text(data.contributor, "contributor"),
-        "corrected",
-      );
+      memory = addContribution(memory, data.contributor, "corrected");
       assertNoCredentials(memory, env.MEMORY_API_TOKEN);
       state.memories = state.memories.map((m) =>
         key(m, state.origin) === key(old, state.origin) ? memory : m,
@@ -419,13 +436,8 @@ export async function route(request: Request, env: Env): Promise<Response> {
         origin: m.x_omp_origin ?? state.origin,
         identifier: m.identifier,
         deleted_at: new Date().toISOString(),
-        provenance: addContribution(
-          { ...m, provenance: [] },
-          data.contributor === undefined
-            ? "system:omp-cloudflare"
-            : text(data.contributor, "contributor"),
-          "deleted",
-        ).provenance,
+        provenance: addContribution({ ...m, provenance: [] }, data.contributor, "deleted")
+          .provenance,
         reason:
           data.reason === undefined
             ? "Deletion requested through memory API"

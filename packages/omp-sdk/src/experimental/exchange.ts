@@ -3,6 +3,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import {
   OmpError,
+  assertNoCredentials,
   jsonValue,
   label,
   timestampSchema,
@@ -72,6 +73,11 @@ export interface ExchangeSource {
 }
 
 export function archive(state: ExchangeSource, exportedAt = new Date().toISOString()): Archive {
+  assertNoCredentials({
+    origin: state.origin,
+    memories: state.memories,
+    tombstones: state.tombstones,
+  });
   const counts = new Map<string, number>();
 
   for (const memory of state.memories)

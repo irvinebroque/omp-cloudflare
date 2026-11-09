@@ -1,6 +1,12 @@
 import { ApiError } from "./errors.ts";
 import { createHash } from "node:crypto";
-import { appendContribution, stable, type Memory } from "omp-sdk/core";
+import {
+  appendContribution,
+  contributorSchema,
+  stable,
+  type JsonInput,
+  type Memory,
+} from "omp-sdk/core";
 import { text, type State } from "./model.ts";
 export { applicable, validateContext, validateConventions } from "./context.ts";
 
@@ -31,7 +37,7 @@ export function selectMemory(state: State, data: MemorySelection): Memory {
 
 export function addContribution(
   memory: Memory,
-  contributor: string,
+  contributor: JsonInput,
   contribution: string,
   at = new Date().toISOString(),
 ): Memory {
@@ -39,14 +45,13 @@ export function addContribution(
 
   if (previous.length >= 100) throw new ApiError(413, "Prototype limit: 100 provenance entries");
 
-  return appendContribution(memory, {
-    id: text(contributor, "contributor"),
-    kind: contributor.startsWith("system:")
-      ? "system"
-      : contributor.startsWith("user:")
-        ? "human"
-        : "agent",
-    contribution,
-    at,
-  });
+  const parsed = contributorSchema.safeParse(
+    contributor === undefined ? { id: "system:omp-cloudflare", kind: "system" } : contributor,
+  );
+  if (!parsed.success) throw new ApiError(400, "contributor must include an explicit id and kind");
+  const writer = parsed.data;
+  writer.id = text(writer.id, "contributor.id");
+  writer.contribution = contribution;
+  writer.at = at;
+  return appendContribution(memory, writer);
 }

@@ -66,7 +66,7 @@ async function add(store: string, suffix: string, extra: Record<string, JsonInpu
     body: prefix + " " + suffix,
     title: suffix,
     applies_to: { level: "user" },
-    contributor: "agent:omp-test",
+    contributor: { id: "agent:omp-test", kind: "agent" },
     ...extra,
   });
 
@@ -145,7 +145,7 @@ try {
     context,
     if_version: personal.version,
     patch: { body: prefix + " revised" },
-    contributor: "agent:omp-test",
+    contributor: { id: "agent:omp-test", kind: "agent" },
   });
 
   assert.notEqual(updated.version, personal.version);
@@ -155,7 +155,7 @@ try {
     context,
     if_version: personal.version,
     patch: { body: "stale" },
-    contributor: "agent:other",
+    contributor: { id: "agent:other", kind: "agent" },
   });
 
   assert.equal(stale.isError, true);
@@ -178,14 +178,14 @@ try {
     context,
     if_version: company.version,
     patch: { title: "changed elsewhere" },
-    contributor: "agent:omp-test",
+    contributor: { id: "agent:omp-test", kind: "agent" },
   });
   await call(projectSchema, "update_memory", {
     ...personal.ref,
     context,
     if_version: updated.version,
     patch: { title: "still current" },
-    contributor: "agent:omp-test",
+    contributor: { id: "agent:omp-test", kind: "agent" },
   });
   ok("Stale edits/deletes fail; unrelated writes do not invalidate per-memory versions");
 
@@ -193,7 +193,7 @@ try {
     store: "company",
     body: "bad",
     applies_to: { level: "repository" },
-    contributor: "agent:test",
+    contributor: { id: "agent:test", kind: "agent" },
   });
 
   assert.equal(invalid.isError, true);
@@ -210,7 +210,7 @@ try {
         context,
         if_version: head.version,
         patch: { body: prefix + " " + body },
-        contributor: "agent:concurrent-test",
+        contributor: { id: "agent:concurrent-test", kind: "agent" },
       }),
     ),
   );

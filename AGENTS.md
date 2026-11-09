@@ -13,3 +13,9 @@ Run `pnpm verify` before pushing. E2E uses isolated local state. Live checks wri
 This is a pnpm workspace. `packages/omp-sdk` contains provider-neutral protocol utilities and explicit experimental entry points; `apps/cloudflare` owns storage, authentication, HTTP clients/contracts/status mapping, runtime activation, migration, deployment quotas and credential policy. Consume SDK public package exports via `workspace:*`, never relative imports into its source. Build the SDK before running consumers directly.
 
 Keep the dependency one-way: the SDK must not import the app, Cloudflare bindings, Node built-ins, or implementation HTTP routes. Markdown storage is supplied by caller-owned read/write adapters. Do not promote experimental encoding/convention choices into adopted protocol requirements.
+
+## Compliance scope
+
+Target the OMP v0.5 editors’ draft at upstream revision `81e99b79480af77528c8499b306920c78d1c6d76`, linked in CONFORMANCE.md. The user’s goal is complete compliance with core requirements and supported profiles. This does not authorize adding every optional profile. Audit and secure forgetting remain unsupported unless separately requested.
+
+Every proposed feature or protocol change must cite a concrete clause in that target and have relevant regression evidence. Do not add automatic Git exports, new transfer modes or new protocol conventions merely as product ideas. Where the draft leaves implementation details open, describe the implementation choice explicitly and never present it as standardized syntax. Keep unsupported and unresolved requirements visible in CONFORMANCE.md. Do not claim an adopted standard or official certification.

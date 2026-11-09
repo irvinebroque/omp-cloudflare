@@ -85,7 +85,7 @@ export function memoryRegistry(env: Env, store: () => Promise<Store>) {
       return output(
         await call("upload/inferences", {
           memory: { ...identity, body, title, media_type: "text/plain", protocol_version: "0.5" },
-          contributor: "agent:pi-chat",
+          contributor: { id: "agent:pi-chat", kind: "agent" },
         }),
       );
     },

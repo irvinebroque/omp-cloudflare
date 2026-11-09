@@ -17,6 +17,13 @@ function snapshot(memories: Memory[]) {
   return archive({ origin: "source:a", memories, tombstones: [] }, "2026-11-09T00:00:00Z");
 }
 
+it("§8.6 rejects credential-bearing metadata in a Markdown export without dropping fields", () => {
+  const input = snapshot([referenceMemory]);
+  input.manifest.client_secret = "synthetic-secret";
+  expect(() => exportMarkdown(input)).toThrow("recognizable credentials");
+  expect(input.manifest.client_secret).toBe("synthetic-secret");
+});
+
 it("loads only immediate summaries, then the selected body and metadata", async () => {
   const widget = {
     ...referenceMemory,

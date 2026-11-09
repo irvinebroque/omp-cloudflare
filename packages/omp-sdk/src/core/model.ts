@@ -30,7 +30,7 @@ export const memorySchema = z
       .string()
       .min(1)
       .regex(
-        /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+(?:\s*;\s*[a-z0-9!#$&^_.+-]+=(?:[a-z0-9!#$&^_.+-]+|"[^"\r\n]*"))*$/iu,
+        /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+(?:[\t ]*;[\t ]*[a-z0-9!#$%&'*+.^_`|~-]+=(?:[a-z0-9!#$%&'*+.^_`|~-]+|"(?:[\t\x20\x21\x23-\x5b\x5d-\x7e\x80-\xff]|\\[\t\x20-\x7e\x80-\xff])*"))*$/iu,
         "Invalid MIME type",
       ),
     created_at: timestampSchema,

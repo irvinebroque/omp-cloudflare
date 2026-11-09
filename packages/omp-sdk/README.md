@@ -36,7 +36,7 @@ const attributed = appendContribution(memory, {
 });
 ```
 
-Unknown JSON metadata survives parsing, including contributor extensions. Attribution is explicit: `appendContribution` neither infers kind from an ID nor invents an author. Applications enforce their own resource, request and credential policies. `OmpError` carries semantic `invalid_input`/`conflict` codes; applications choose their own transport status mapping.
+Unknown JSON metadata survives parsing, including contributor extensions. Attribution is explicit: `appendContribution` neither infers kind from an ID nor invents an author. Applications enforce their own resource/request limits and supply checks for credentials known to them. Portable export helpers reject recognizable credential data under draft §8.6; `assertNoCredentials(value, knownSecrets?)` can additionally check caller-supplied secrets. This does not classify arbitrary unlabelled text as secret or safe. `OmpError` carries semantic `invalid_input`/`conflict` codes; applications choose their own transport status mapping.
 
 `key(memory, fallbackOrigin)` constructs an identity key; `stable(value)` compares deterministic JSON. Neither is a portable checksum or revision-comparison standard. `x_omp_origin` is an experimental convention for retaining source origin.
 
@@ -56,7 +56,7 @@ const restored = importedMemories(parsed);
 
 The experimental envelope supports `minimal`/`copy` snapshots and selections. Colliding identifiers are aliased consistently across recognized links, evidence targets and exact `[[identifier]]` references in plain text or Markdown. The identity map restores original identities on import. Unknown reference shapes stay opaque. A checksummed memory needing rewriting causes an error rather than acquiring a stale checksum.
 
-`danglingReferences` reports missing recognized targets separately from memory objects. `currentMemories` excludes expired, future and superseded memories using this convention. The SDK does not merge conflicting revisions or implement ACLs, runtime activation policy, ranking or storage.
+`danglingReferences` reports missing recognized targets separately from memory objects. `currentMemories` excludes expired, future and superseded memories using this convention. Imported provenance and evidence are claims by their source origin, not verified facts. Missing provenance means unknown authorship. The SDK does not merge conflicting revisions or implement ACLs, runtime activation policy, ranking or storage.
 
 ## Export and load Markdown progressively
 
@@ -107,7 +107,7 @@ projects/widget.md          Exact body, without generated front matter
 projects/widget.md.json     Full metadata except body, plus original identity
 ```
 
-This implements the draft’s [§10.2 loading pattern](https://github.com/The-AI-Disclosures-Project/Open-Memory-Protocol/blob/main/working-group/exchange-and-runtime/2026-11-06-working-spec-v0.5.md#102-markdown-directory-loading-profile), using a repository-defined `omp-markdown/0.1` encoding. The draft does not specify these index/sidecar filenames or API methods. No interoperable finalized Markdown encoding is claimed.
+This implements the draft’s [§10.2 loading pattern](https://github.com/The-AI-Disclosures-Project/Open-Memory-Protocol/blob/main/working-group/exchange-and-runtime/2026-11-06-working-spec-v0.5.md#102-markdown-loading-profile), using a repository-defined `omp-markdown/0.1` encoding. The draft does not specify these index/sidecar filenames or API methods. No interoperable finalized Markdown encoding is claimed.
 
 Safe relative source paths are lowercased and given an `.md` extension when needed. Unsafe, reserved or colliding paths receive deterministic filenames derived from identity. The original `memory.path` stays in metadata. Root `MEMORY.md` is always the generated index; a memory requesting that path is relocated. Bodies retain their original text and media type, including non-Markdown content. JSON sidecars preserve fields without loss; deleting sidecars or copying only `.md` files loses metadata and the exchange ledger. Paths and immediate-child relationships are validated before calling the reader. The caller owns filesystem/HTTP permissions and the reader’s own resource limits.
 

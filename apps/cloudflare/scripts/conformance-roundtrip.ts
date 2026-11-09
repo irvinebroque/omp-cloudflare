@@ -40,6 +40,8 @@ try {
       { links: false },
       { checksum: 42 },
       { updated_at: "yesterday" },
+      { scope: ["caller-selected-scope"] },
+      { media_type: "text/plain\n; charset=utf-8" },
     ].map((patch) =>
       post(
         "upload/inferences",
@@ -67,6 +69,59 @@ try {
   );
   await absent(() => client.read(prefix + "-invalid-import"));
   console.log("PASS HTTP upload/import reject malformed standard fields and impossible dates");
+
+  await post(
+    "upload/inferences",
+    {
+      memory: { identifier: prefix + "-legacy-contributor", body: "Unattributed" },
+      contributor: "user:guessed-human",
+    },
+    400,
+  );
+  const requestStarted = Date.now();
+  const explicitInput = {
+    identifier: prefix + "-explicit-contributor",
+    created_at: "2020-01-01T00:00:00Z",
+    media_type: 'text/plain; note="quoted\\\"value"',
+    body: "An explicit contributor is a claim, not a prefix heuristic",
+  };
+  const explicit = await client.remember(explicitInput, {
+    id: "user:opaque-agent",
+    kind: "agent",
+    custom: { retain: true },
+  });
+  created.push({ identifier: explicit.memory.identifier });
+  const writer = explicit.memory.provenance?.at(-1);
+  assert.equal(writer?.kind, "agent");
+  assert.deepEqual(writer?.custom, { retain: true });
+  assert.ok(writer?.at !== undefined && Date.parse(writer.at) >= requestStarted);
+  assert.equal(explicit.memory.media_type, 'text/plain; note="quoted\\\"value"');
+  await post(
+    "update",
+    { identifier: explicit.memory.identifier, patch: { scope: ["caller-selected-scope"] } },
+    400,
+  );
+  assert.equal((await client.read(explicit.memory.identifier)).memory.scope, undefined);
+  const retried = await client.remember(explicitInput, {
+    id: "user:opaque-agent",
+    kind: "agent",
+    custom: { retain: true },
+  });
+  assert.equal(retried.receipts[0]?.status, "unchanged");
+  assert.deepEqual(retried.memory, explicit.memory);
+  assert.equal(retried.commit, explicit.commit);
+  await assert.rejects(
+    () =>
+      client.remember(
+        { ...explicitInput, body: "Conflicting retry" },
+        { id: "user:opaque-agent", kind: "agent", custom: { retain: true } },
+      ),
+    (error) => error instanceof ApiError && error.status === 409,
+  );
+  await client.delete(explicit.memory.identifier);
+  console.log(
+    "PASS §§3.2/4.1/4.5 explicit contributor kinds, actual writer times, MIME parameters and system-owned scope",
+  );
 
   const original = await client.remember({
     identifier: prefix + "-original",
@@ -163,12 +218,17 @@ try {
         media_type: "text/plain",
         created_at: "2026-11-01T00:00:00Z",
         body: "Imported",
+        scope: ["external:claim"],
         evidence: [{ target: missing }],
       },
     ],
     tombstones: [],
   });
   assert.equal((await client.import(imported)).receipts[0]?.status, "accepted");
+  assert.deepEqual(
+    (await client.read(prefix + "-import-dangling", imported.manifest.origin)).memory.scope,
+    ["external:claim"],
+  );
   created.push({ identifier: prefix + "-import-dangling", origin: imported.manifest.origin });
   console.log(
     "PASS missing references survive import and are marked in HTTP, MCP and export metadata",

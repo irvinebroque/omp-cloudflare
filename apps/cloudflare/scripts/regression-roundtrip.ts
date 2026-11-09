@@ -64,7 +64,7 @@ try {
       context: {},
       if_version: fetched.version,
       patch: { body: "Changed" },
-      contributor: "agent:regression",
+      contributor: { id: "agent:regression", kind: "agent" },
     },
   });
 
